@@ -12,6 +12,7 @@ import glob
 import sys
 
 
+
 # try:
 #     from urllib2 import urlopen
 # except ImportError:
@@ -27,7 +28,6 @@ from SAFNWCnc import SAFNWC_CTTH
 from datetime import datetime
 
 satConversion = {'himawari': 'hima08', 'hima08': 'hima08', 'msg1': 'msg1', 'msg3': 'msg3'}
-
 #----------------------------------------------------
 
 def chart(obts,field,cmap='jet',clim=[180.,300.],txt=[''],subgrid=None, block=True, xlocs=None, figsize= None, show=True, typ1='', typ2='', datum='', sat=''):
@@ -280,6 +280,7 @@ if __name__ == '__main__':
     ncf_old.close()
     ncf_new.close()
     lat, lon = getLatLon(sfn)
+#     pdb.set_trace()
     #: Plotting    
     fig = plt.figure()
     ax = fig.add_subplot(3,1,1)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
@@ -398,6 +399,14 @@ if __name__ == '__main__':
     
     
     
+    gg = geosat.GeoGrid('FullAMA_SAFBox')
+    fig = plt.figure(figsize=[10, 6])
+    proj = ccrs.PlateCarree(central_longitude=0)
+    ax = fig.add_subplot(111, projection=proj)
+    ax.coastlines()
+    ax.imshow(prod_new)
+    fig.show()
+    pdb.set_trace()
     
     
     
