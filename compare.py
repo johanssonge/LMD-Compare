@@ -11,19 +11,95 @@ import h5py  # @UnresolvedImport
 import glob
 import sys
 
+
+# try:
+#     from urllib2 import urlopen
+# except ImportError:
+#     from urllib.request import urlopen
+# from io import BytesIO
+import cartopy.crs as ccrs  # @UnresolvedImport
+from cartopy import feature  # @UnresolvedImport
+import matplotlib.pyplot as plt  # @UnresolvedImport
+
 sys.path.append('/home/erikj/Projects/STC/pylib')
 import geosat
-try:
-    from urllib2 import urlopen
-except ImportError:
-    from urllib.request import urlopen
-from io import BytesIO
+from SAFNWCnc import SAFNWC_CTTH
+from datetime import datetime
 
-import cartopy.crs as ccrs
-import matplotlib.pyplot as plt
-
+satConversion = {'himawari': 'hima08', 'hima08': 'hima08', 'msg1': 'msg1', 'msg3': 'msg3'}
 
 #----------------------------------------------------
+
+def chart(obt,field,cmap='jet',clim=[190.,300.],txt='',subgrid=None, block=True, xlocs=None, figsize= None, show=True):
+        # test existence of key field
+        if field not in obt.var.keys():
+            print ('undefined field')
+            return
+        if subgrid == None:
+            geogrid = obt.geogrid
+        else:
+            geogrid = subgrid
+        if 'FullAMA' in geogrid.gridtype:
+            fig = plt.figure(figsize=[10, 6])
+        elif figsize is not None:
+            fig = plt.figure(figsize=figsize)
+        else:
+            fig = plt.figure(figsize=[11,4])
+#         fig.subplots_adjust(hspace=0,wspace=0.5,top=0.925,left=0.)
+        fs = 15
+        # it is unclear how the trick with cm_lon works in imshow but it does
+        # the web says that it is tricky to plot data accross dateline with cartopy
+        # check https://stackoverflow.com/questions/47335851/issue-w-image-crossing-dateline-in-imshow-cartopy
+        cm_lon =0
+        # guess that we want to plot accross dateline
+        if geogrid.box_range[0,1]> 181:
+            cm_lon = 180
+        proj = ccrs.PlateCarree(central_longitude=cm_lon)
+#         ax = plt.axes(projection = proj)
+        ax = fig.add_subplot(111, projection = proj)
+        if subgrid == None:
+            plotted_field = obt.var[field]
+        else:
+            # extraction in subgrid
+            plotted_field = obt.var[field][geogrid.corner[1]:geogrid.corner[1]+geogrid.box_biny,
+                                            geogrid.corner[0]:geogrid.corner[0]+geogrid.box_binx]
+        iax = ax.imshow(plotted_field, transform=proj, interpolation='nearest',
+                    extent=geogrid.box_range.flatten()-np.array([cm_lon,cm_lon,0,0]),
+                    origin='lower', aspect=1.,cmap=cmap,clim=clim)
+        ax.add_feature(feature.NaturalEarthFeature(
+            category='cultural',
+            name='admin_1_states_provinces_lines',
+            scale='50m',
+            facecolor='none'))
+        ax.coastlines('50m')
+        #ax.add_feature(feature.BORDERS)
+        # The grid adjusts automatically with the following lines
+        # If crossing the dateline, superimposition of labels there
+        # can be suppressed by specifying xlocs
+
+        if (cm_lon == 180) & (xlocs == None): xlocs = [0,30,60,90,120,150,180,-150,-120,-90,-60,-30]
+        gl = ax.gridlines(draw_labels=True, xlocs=xlocs,
+                      linewidth=2, color='gray', alpha=0.5, linestyle='--')
+        gl.top_labels = False
+        gl.right_labels = False
+        #gl.xformatter = LONGITUDE_FORMATTER
+        #gl.yformatter = LATITUDE_FORMATTER
+        gl.xlabel_style = {'size': fs}
+        gl.ylabel_style = {'size': fs}
+        #gl.xlabel_style = {'color': 'red', 'weight': 'bold'}
+        plt.title(txt,fontsize=fs)
+        # plot adjusted colorbar and show
+        axpos = ax.get_position()
+        pos_x = axpos.x0 + axpos.x0 + axpos.width + 0.01
+        pos_cax = fig.add_axes([pos_x,axpos.y0,0.04,axpos.height])
+        cbar=fig.colorbar(iax,cax=pos_cax)
+        cbar.ax.tick_params(labelsize=fs)
+        if show:
+            fig.show()
+        return ax
+
+
+
 
 def saveLatLon(ncf, fn):
     basename = os.path.basename(fn)
@@ -63,18 +139,25 @@ def getLatLon(gfn):
 
 if __name__ == '__main__':
     mainDir_new = '/scratch/b.legras/NWCGEO-APPLI-2018.1-9/export'
-    mainDir_old = '/scratch/b.legras/OLD-V2016/NWCGEO-APPLI-3/export'
+    mainDir_old = '/scratch/b.legras/sats/msg1/safnwc-SAFBox/netcdf'
+#     mainDir_old = '/scratch/b.legras/OLD-V2016/NWCGEO-APPLI-3/export'
     plotDir = '/scratch/erikj/Data/Nwcgeo/Compare/Plots'
 #     fil = 'S_NWC_CMA_MSG1_FULLAMA-VISIR_20170515T053000Z.nc'
     
     sat='MSG1'
+    year = 2017
+    mon = 5
+    day = 5
+    hour = 14
+    min = 0
     datum = '20170429T1400'
     product = 'CTTH'
 #     HIMAWARI08
-    files_new = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_new, product, product, sat, datum))
-    files_old = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, product, product, sat, datum))
+    files_new = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%d%02d%02dT%02d%02d*.nc' %(mainDir_new, product, product, sat, year, mon, day, hour, min))
+#     files_old = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, product, product, sat, datum))
+    files_old = glob.glob('%s/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%d%02d%02dT%02d%02d*.nc' %(mainDir_old, year, mon, day, product, sat, year, mon, day, hour, min))
     files_new.sort()
-    files_new.sort()
+    files_old.sort()
     fil_new = files_new[0]
     fil_old = files_old[0]
 #     filename = mainDir + '/' + fil
@@ -84,8 +167,10 @@ if __name__ == '__main__':
     nc_prod = product.lower()
     if nc_prod == 'ctth':
         nc_prod = 'ctth_pres'
-    prod_new = ncf_new[nc_prod][:].data.astype(float)
-    prod_old = ncf_old[nc_prod][:].data.astype(float)
+    mask_prod_new = ncf_new[nc_prod][:]
+    mask_prod_old = ncf_old[nc_prod][:]
+    prod_new = mask_prod_new.data.astype(float)
+    prod_old = mask_prod_old.data.astype(float)
     
     prod_new[ncf_new[nc_prod][:].mask] = np.nan
     prod_old[ncf_old[nc_prod][:].mask] = np.nan
@@ -95,7 +180,6 @@ if __name__ == '__main__':
     ncf_old.close()
     ncf_new.close()
     lat, lon = getLatLon(sfn)
-#     pdb.set_trace()
     #: Plotting    
     fig = plt.figure()
     ax = fig.add_subplot(3,1,1)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
@@ -108,9 +192,9 @@ if __name__ == '__main__':
     im = ax.imshow(prod_old)
     cbar = fig.colorbar(im)
     ax.set_title('2016')
-    
+    prod_diff = prod_new - prod_old
     ax = fig.add_subplot(3,1,3)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
-    im = ax.imshow((prod_new - prod_old), cmap='RdBu_r')
+    im = ax.imshow((prod_diff), cmap='RdBu_r')
     cbar = fig.colorbar(im)#, orientation='horizontal', cax=cbar_ax, ticks=barticks)  # @UnusedVariable
     ax.set_title('2018 - 2016')
     
@@ -121,14 +205,99 @@ if __name__ == '__main__':
     fig.show()
     
     
-    gg = geosat.GeoGrid('FullAMA_SAFBox')
-    fig = plt.figure(figsize=[10, 6])
-    proj = ccrs.PlateCarree(central_longitude=0)
-    ax = fig.add_subplot(111, projection=proj)
-    ax.coastlines()
-    ax.imshow(prod_new)
-    fig.show()
+    
+    #: Initiate the data
+    date = datetime(year,day,mon,hour,min)
+    dat_new = SAFNWC_CTTH(date,'msg1',BBname='SAFBox',fullname=fil_new)
+    dat_old = SAFNWC_CTTH(date,'msg1',BBname='SAFBox',fullname=fil_old)
+    #: Change to new
+    
+    gg_new = geosat.GeoGrid('FullAMA_SAFBox')
+    gg_old = geosat.GeoGrid('FullAMA_SAFBox')
+    dat_new._CTTH_PRESS()
+    dat_old._CTTH_PRESS()
+#     dat.show('CTTH_PRESS')
+    p1_new = geosat.SatGrid(dat_new,gg_new)
+    p1_old = geosat.SatGrid(dat_old,gg_old)
+#     p1.var.update({'CTTH_PRESS':mask_prod_new})
+    p1_new._sat_togrid('CTTH_PRESS')
+    p1_old._sat_togrid('CTTH_PRESS')
+    import copy
+    chart(p1_new, 'CTTH_PRESS')
+    chart(p1_old, 'CTTH_PRESS')
+    p1_diff = copy.copy(p1_new)
     pdb.set_trace()
+    p1_diff.var['CTTH_PRESS'].data[:] = np.where((p1_new.var['CTTH_PRESS'].data==mask_prod_new.fill_value) | (p1_old.var['CTTH_PRESS'].data==mask_prod_old.fill_value), mask_prod_new.fill_value, p1_new.var['CTTH_PRESS'].data-p1_old.var['CTTH_PRESS'].data)
+#     np.where(np.isnan(prod_diff), mask_prod_new.fill_value, prod_diff)
+    chart(p1_diff, 'CTTH_PRESS')
+    print('hmm')
+    pdb.set_trace()
+    p1.chart('CTTH_PRESS')
+    pdb.set_trace()
+    p1_diff.var['CTTH_PRESS'].data
+    
+    
+    
+    
+    
+    
+    
+    
+    
+#     (Pdb) mask_prod_new
+# masked_array(
+#   data=[[--, --, --, ..., --, --, --],
+#         [--, --, --, ..., --, --, --],
+#         [--, --, --, ..., --, --, --],
+#         ...,
+#         [--, --, --, ..., --, --, --],
+#         [--, --, --, ..., --, --, --],
+#         [--, --, --, ..., --, --, --]],
+#   mask=[[ True,  True,  True, ...,  True,  True,  True],
+#         [ True,  True,  True, ...,  True,  True,  True],
+#         [ True,  True,  True, ...,  True,  True,  True],
+#         ...,
+#         [ True,  True,  True, ...,  True,  True,  True],
+#         [ True,  True,  True, ...,  True,  True,  True],
+#         [ True,  True,  True, ...,  True,  True,  True]],
+#   fill_value=65535,
+#   dtype=float32)
+# (Pdb) dat.var['CTTH_PRESS']
+# masked_array(
+#   data=[[--, --, --, ..., --, --, --],
+#         [--, --, --, ..., --, --, --],
+#         [--, --, --, ..., --, --, --],
+#         ...,
+#         [65535.0, 65535.0, 65535.0, ..., 65535.0, 65535.0, 65535.0],
+#         [65535.0, 65535.0, 65535.0, ..., 65535.0, 65535.0, 65535.0],
+#         [65535.0, 65535.0, 65535.0, ..., 65535.0, 65535.0, 65535.0]],
+#   mask=[[ True,  True,  True, ...,  True,  True,  True],
+#         [ True,  True,  True, ...,  True,  True,  True],
+#         [ True,  True,  True, ...,  True,  True,  True],
+#         ...,
+#         [False, False, False, ..., False, False, False],
+#         [False, False, False, ..., False, False, False],
+#         [False, False, False, ..., False, False, False]],
+#   fill_value=65535.0,
+#   dtype=float32)
+# (Pdb) dat.copy()
+# *** AttributeError: 'SAFNWC_CTTH' object has no attribute 'copy'
+# (Pdb) import copy
+# (Pdb) copy(dat)
+# *** TypeError: 'module' object is not callable
+# (Pdb) copy.copy(dat)
+# <SAFNWCnc.SAFNWC_CTTH object at 0x7f98af2356d0>
+# (Pdb) copy.deepcopy(dat)
+# *** NotImplementedError: Dataset is not picklable
+# (Pdb) copy.deep_copy(dat)
+# *** AttributeError: module 'copy' has no attribute 'deep_copy'
+
+    
+    
+    
+    
+    
+    
     
     
     
