@@ -153,16 +153,22 @@ def bars(obts,field,txt=[''], show=True, typ1='', typ2='', datum='', sat=''):
                 plotted_field = obt.var[field].data[:]
             if txt[f] == 'Diff':
                 rang = (-30, 30)
+                bins=20
             else:
                 rang = (50, 500)
-            plotted_field = np.where(plotted_field == 65535.0, np.nan, plotted_field)
-            
-            ax.hist(plotted_field, range=rang)#, aspect=1.)
+                bins =150
+            mapv = ~(plotted_field == 65535.0)
+            plotted_field = plotted_field[mapv]# / 100
+#             plotted_field = np.where(plotted_field == 65535.0, np.nan, plotted_field)
+            print(1)
+#             ax.hist(plotted_field, range=rang)#, aspect=1.)
+            ax.hist(plotted_field, bins=bins, range=rang)#, aspect=1.)
 #             pdb.set_trace()
+            print(2)
             ax.set_title(txt[f],fontsize=fs)
 #             if f in [0,1]:
-            ax.set_ylim((0, 150))
-            ax.set_yticks([0, 50, 100, 150])
+#             ax.set_ylim((0, 150))
+#             ax.set_yticks([0, 50, 100, 150])
 #             gl.xlabel_style = {'size': fs}
 #             gl.ylabel_style = {'size': fs}
 #             #gl.xlabel_style = {'color': 'red', 'weight': 'bold'}
@@ -350,8 +356,8 @@ if __name__ == '__main__':
         p1_diff_var = np.where(valid_mask, p1_new.var[grid_type].data-p1_old.var[grid_type].data, mask_prod_new.fill_value)
         p1_diff = {grid_type: p1_diff_var}
     #     np.where(np.isnan(prod_diff), mask_prod_new.fill_value, prod_diff)
-        bars([p1_new, p1_old, p1_diff], grid_type, txt=[typ1, typ2, 'Diff'], show=False, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
-        chart([p1_new, p1_old, p1_diff], grid_type, txt=[typ1, typ2, 'Diff'], show=False, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
+        bars([p1_new, p1_old, p1_diff], grid_type, txt=[typ1, typ2, 'Diff'], show=True, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
+        chart([p1_new, p1_old, p1_diff], grid_type,clim=[70.,150.], txt=[typ1, typ2, 'Diff'], show=True, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
         #: Aggregate
         p1_new_agg.extend(p1_new.var[grid_type].data)
         p1_old_agg.extend(p1_old.var[grid_type].data)
