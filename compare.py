@@ -27,7 +27,7 @@ import geosat
 from SAFNWCnc import SAFNWC_CTTH
 from datetime import datetime
 
-satConversion = {'himawari': 'hima08', 'hima08': 'hima08', 'msg1': 'msg1', 'msg3': 'msg3'}
+satConversion = {'hima08': 'himawari', 'msg1': 'msg1', 'msg3': 'msg3'}
 #----------------------------------------------------
 
 def chart(obts,field,cmap='jet',clim=[180.,300.],txt=[''],subgrid=None, block=True, xlocs=None, figsize= None, show=True, typ1='', typ2='', datum='', sat=''):
@@ -137,9 +137,10 @@ def bars(obts,field,txt=[''], show=True, typ1='', typ2='', datum='', sat=''):
             obts = [obts]
         obt_t = obts[0]
         # test existence of key field
-        if field not in obt_t.var.keys():
-            print ('undefined field')
-            return
+#         pdb.set_trace()
+#         if field not in obt_t.var.keys():
+#             print ('undefined field')
+#             return
         
         fig = plt.figure(figsize=[11,4])
         fig.suptitle('%s, %s, %s' %(sat, field, datum))
@@ -148,9 +149,11 @@ def bars(obts,field,txt=[''], show=True, typ1='', typ2='', datum='', sat=''):
             ax = fig.add_subplot(len(obts), 1, f+1)
             if isinstance(obt, dict):
                 plotted_field = obt[field]
-                rang = (-30, 30)
             else:
                 plotted_field = obt.var[field].data[:]
+            if txt[f] == 'Diff':
+                rang = (-30, 30)
+            else:
                 rang = (50, 500)
             plotted_field = np.where(plotted_field == 65535.0, np.nan, plotted_field)
             
@@ -198,6 +201,7 @@ def saveLatLon(ncf, fn):
     satname = basename.split('_')[3].lower()
     sfn = '%s/%s_LonLat.h5' %(LatLonDir, satname)
     if not os.path.isfile(sfn):
+        pdb.set_trace()
         lon = ncf['lon'][:].data
         lat = ncf['lat'][:].data
         f = h5py.File(sfn, 'w')
@@ -229,12 +233,18 @@ def getLatLon(gfn):
 #----------------------------------------------------
 
 if __name__ == '__main__':
-    mainDir_new = '/scratch/b.legras/NWCGEO-APPLI-2018.1-9/export'
-    mainDir_old = '/scratch/b.legras/sats/msg1/safnwc-SAFBox/netcdf'
-#     mainDir_old = '/scratch/b.legras/OLD-V2016/NWCGEO-APPLI-3/export'
+    mainDir_new = '/scratch/b.legras/NWCGEO-APPLI-2018.1-8/export'
+#     mainDir_old = '/scratch/b.legras/sats/himawari/safnwc/netcdf/2017/'
     plotDir = '/scratch/erikj/Data/Nwcgeo/Compare/Plots'
 #     fil = 'S_NWC_CMA_MSG1_FULLAMA-VISIR_20170515T053000Z.nc'
-    
+    sat='HIMA08' #'MSG1'
+    if sat == 'HIMA08':
+        sat_dir = 'himawari'
+        sat_fil = 'HIMAWARI08'
+    else:
+        sat_dir = sat
+        sat_fil = sat
+    mainDir_old = '/scratch/b.legras/sats/%s/safnwc-SAFBox/netcdf' %sat_dir
     if mainDir_new.split('/')[3] == 'sats':
         typ1 = '2016'
     else:
@@ -243,63 +253,73 @@ if __name__ == '__main__':
         typ2 = '2016'
     else:
         typ2 = mainDir_old.split('/')[3].replace('NWCGEO-APPLI-', '')
-
-    sat='MSG1'
-    year = 2017
-    mon = 5
-    day = 5
-    hour = 14
-    minut = 0
-    datum = '%d%02d%02dT%02d%02d' %(year, mon, day, hour, minut)
-    product = 'CTTH'
+    
+    p1_new_agg = []
+    p1_old_agg = []
+    p1_diff_agg = []
+    for date in [datetime(2017,7,22,20,0), datetime(2017,7,22,20,20), datetime(2017,7,22,21,0), \
+                datetime(2017,7,24,8,40), datetime(2017,7,24,9,0), datetime(2017,7,24,9,20), \
+                datetime(2017,7,26,15,40), datetime(2017,7,26,16,0), datetime(2017,7,26,16,20)]:
+        year = date.year
+        mon = date.month
+        day = date.day
+#         hour = 20
+#         minut = 0
+        datum = date.isoformat().replace('-', '').replace(':', '')[0:-2]
+#         datum = '%d%02d%02dT%02d%02d' %(year, mon, day, hour, minut)
+        
+        product = 'CTTH'
 #     HIMAWARI08
-    files_new = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%d%02d%02dT%02d%02d*.nc' %(mainDir_new, product, product, sat, year, mon, day, hour, minut))
+        files_new = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_new, product, product, sat, datum))
 #     files_old = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, product, product, sat, datum))
-    files_old = glob.glob('%s/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%d%02d%02dT%02d%02d*.nc' %(mainDir_old, year, mon, day, product, sat, year, mon, day, hour, minut))
-    files_new.sort()
-    files_old.sort()
-    fil_new = files_new[0]
-    fil_old = files_old[0]
+#     files_old = glob.glob('%s/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%d%02d%02dT%02d%02d*.nc' %(mainDir_old, year, mon, day, product, sat, year, mon, day, hour, minut))
+        files_old = glob.glob('%s/%d/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, year, year, mon, day, product, sat_fil, datum))
+        
+        files_new.sort()
+        files_old.sort()
+        fil_new = files_new[0]
+        fil_old = files_old[0]
 #     filename = mainDir + '/' + fil
-    ncf_new = nc.Dataset(fil_new)
-    ncf_old = nc.Dataset(fil_old)
-    #: Read the required data
-    nc_prod = product.lower()
-    if nc_prod == 'ctth':
-        nc_prod = 'ctth_pres'
-    mask_prod_new = ncf_new[nc_prod][:]
-    mask_prod_old = ncf_old[nc_prod][:]
-    prod_new = mask_prod_new.data.astype(float)
-    prod_old = mask_prod_old.data.astype(float)
-    
-    prod_new[ncf_new[nc_prod][:].mask] = np.nan
-    prod_old[ncf_old[nc_prod][:].mask] = np.nan
-    
-    #: Take care of latitude and longitude
-    sfn = saveLatLon(ncf_old, fil_old)
-    ncf_old.close()
-    ncf_new.close()
-    lat, lon = getLatLon(sfn)
-#     pdb.set_trace()
-    #: Plotting    
-    fig = plt.figure()
-    ax = fig.add_subplot(3,1,1)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
-#     ax.coastlines()
-    im = ax.imshow(prod_new)#, extent=(np.nanmin(lon), np.nanmin(lon), np.nanmin(lat), np.nanmin(lat)))#transform=ccrs.Geostationary(satellite_height=35786000))
-    cbar = fig.colorbar(im)
-    ax.set_title('2018')
-    
-    ax = fig.add_subplot(3,1,2)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
-    im = ax.imshow(prod_old)
-    cbar = fig.colorbar(im)
-    ax.set_title('2016')
-    prod_diff = prod_new - prod_old
-    ax = fig.add_subplot(3,1,3)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
-    im = ax.imshow((prod_diff), cmap='RdBu_r')
-    cbar = fig.colorbar(im)#, orientation='horizontal', cax=cbar_ax, ticks=barticks)  # @UnusedVariable
-    ax.set_title('2018 - 2016')
-    
-    plt.tight_layout()
+        ncf_new = nc.Dataset(fil_new)
+        ncf_old = nc.Dataset(fil_old)
+        #: Read the required data
+        nc_prod = product.lower()
+        if nc_prod == 'ctth':
+            nc_prod = 'ctth_pres'
+            grid_type = 'CTTH_PRESS'
+        mask_prod_new = ncf_new[nc_prod][:]
+        mask_prod_old = ncf_old[nc_prod][:]
+        prod_new = mask_prod_new.data.astype(float)
+        prod_old = mask_prod_old.data.astype(float)
+        
+        prod_new[ncf_new[nc_prod][:].mask] = np.nan
+        prod_old[ncf_old[nc_prod][:].mask] = np.nan
+        
+        #: Take care of latitude and longitude
+        sfn = saveLatLon(ncf_old, fil_old)
+        ncf_old.close()
+        ncf_new.close()
+        lat, lon = getLatLon(sfn)
+    #     pdb.set_trace()
+        #: Plotting    
+        fig = plt.figure()
+        ax = fig.add_subplot(3,1,1)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
+    #     ax.coastlines()
+        im = ax.imshow(prod_new)#, extent=(np.nanmin(lon), np.nanmin(lon), np.nanmin(lat), np.nanmin(lat)))#transform=ccrs.Geostationary(satellite_height=35786000))
+        cbar = fig.colorbar(im)
+        ax.set_title('2018')
+        
+        ax = fig.add_subplot(3,1,2)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
+        im = ax.imshow(prod_old)
+        cbar = fig.colorbar(im)
+        ax.set_title('2016')
+        prod_diff = prod_new - prod_old
+        ax = fig.add_subplot(3,1,3)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
+        im = ax.imshow((prod_diff), cmap='RdBu_r')
+        cbar = fig.colorbar(im)#, orientation='horizontal', cax=cbar_ax, ticks=barticks)  # @UnusedVariable
+        ax.set_title('2018 - 2016')
+        
+        plt.tight_layout()
     
 #     figname = '%s/%s_%s' %(plotDir, nc_prod, datum)
 #     fig.savefig(figname + '.png')
@@ -307,38 +327,43 @@ if __name__ == '__main__':
     
     
     
-    #: Initiate the data
-    date = datetime(year,day,mon,hour,minut)
-    dat_new = SAFNWC_CTTH(date,'msg1',BBname='SAFBox',fullname=fil_new)
-    dat_old = SAFNWC_CTTH(date,'msg1',BBname='SAFBox',fullname=fil_old)
-    #: Change to new
-    
-    gg_new = geosat.GeoGrid('FullAMA_SAFBox')
-    gg_old = geosat.GeoGrid('FullAMA_SAFBox')
-    dat_new._CTTH_PRESS()
-    dat_old._CTTH_PRESS()
-#     dat.show('CTTH_PRESS')
-    p1_new = geosat.SatGrid(dat_new,gg_new)
-    p1_old = geosat.SatGrid(dat_old,gg_old)
-#     p1.var.update({'CTTH_PRESS':mask_prod_new})
-    p1_new._sat_togrid('CTTH_PRESS')
-    p1_old._sat_togrid('CTTH_PRESS')
-#     chart(p1_old, 'CTTH_PRESS')
-    
-    p1_diff_var = np.where((p1_new.var['CTTH_PRESS'].data==mask_prod_new.fill_value) | (p1_old.var['CTTH_PRESS'].data==mask_prod_old.fill_value), mask_prod_new.fill_value, p1_new.var['CTTH_PRESS'].data-p1_old.var['CTTH_PRESS'].data)
-    p1_diff = {'CTTH_PRESS': p1_diff_var}
-#     np.where(np.isnan(prod_diff), mask_prod_new.fill_value, prod_diff)
-    bars([p1_new, p1_old, p1_diff], 'CTTH_PRESS', txt=[typ1, typ2, 'Diff'], typ1=typ1, typ2=typ2, datum=datum, sat=sat)
-    chart([p1_new, p1_old, p1_diff], 'CTTH_PRESS', txt=[typ1, typ2, 'Diff'], typ1=typ1, typ2=typ2, datum=datum, sat=sat)
-#     chart(p1_diff, 'CTTH_PRESS')
-    print('hmm')
+        #: Initiate the data
+        dat_new = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=fil_new)
+        dat_old = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=fil_old)
+        #: Change to new
+        
+        gg_new = geosat.GeoGrid('FullAMA_SAFBox')
+        gg_old = geosat.GeoGrid('FullAMA_SAFBox')
+        dat_new._CTTH_PRESS()
+        dat_old._CTTH_PRESS()
+    #     dat.show('CTTH_PRESS')
+        p1_new = geosat.SatGrid(dat_new,gg_new)
+        p1_old = geosat.SatGrid(dat_old,gg_old)
+    #     p1.var.update({'CTTH_PRESS':mask_prod_new})
+        p1_new._sat_togrid(grid_type)
+        p1_old._sat_togrid(grid_type)
+    #     chart(p1_old, 'CTTH_PRESS')
+        valid_mask = ~((p1_new.var[grid_type].data==mask_prod_new.fill_value) | (p1_old.var[grid_type].data==mask_prod_old.fill_value))
+        p1_new_valid = p1_new.var[grid_type].data[valid_mask]
+        p1_old_valid = p1_old.var[grid_type].data[valid_mask]
+        p1_diff_valid = p1_new_valid-p1_old_valid
+        p1_diff_var = np.where(valid_mask, p1_new.var[grid_type].data-p1_old.var[grid_type].data, mask_prod_new.fill_value)
+        p1_diff = {grid_type: p1_diff_var}
+    #     np.where(np.isnan(prod_diff), mask_prod_new.fill_value, prod_diff)
+        bars([p1_new, p1_old, p1_diff], grid_type, txt=[typ1, typ2, 'Diff'], show=False, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
+        chart([p1_new, p1_old, p1_diff], grid_type, txt=[typ1, typ2, 'Diff'], show=False, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
+        #: Aggregate
+        p1_new_agg.extend(p1_new.var[grid_type].data)
+        p1_old_agg.extend(p1_old.var[grid_type].data)
+        p1_diff_agg.extend(p1_diff_var)
+    #     chart(p1_diff, 'CTTH_PRESS')
+    p1_new_agg_dict = {grid_type: p1_new_agg}
+    p1_old_agg_dict = {grid_type: p1_old_agg}
+    p1_diff_agg_dict = {grid_type: p1_diff_agg}
+    bars([p1_new_agg_dict, p1_old_agg_dict, p1_diff_agg_dict], grid_type, txt=[typ1, typ2, 'Diff'], show=True, typ1=typ1, typ2=typ2, sat=sat)
     pdb.set_trace()
-    p1.chart('CTTH_PRESS')
-    pdb.set_trace()
-    p1_diff.var['CTTH_PRESS'].data
     
-    
-    
+    sys.exit()
     
     
     
