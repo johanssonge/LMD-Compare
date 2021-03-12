@@ -12,6 +12,7 @@ import glob
 import sys
 
 
+
 # try:
 #     from urllib2 import urlopen
 # except ImportError:
@@ -25,7 +26,6 @@ sys.path.append('/home/erikj/Projects/STC/pylib')
 import geosat
 from SAFNWCnc import SAFNWC_CTTH
 from datetime import datetime
-
 
 satConversion = {'hima08': 'himawari', 'msg1': 'msg1', 'msg3': 'msg3'}
 #----------------------------------------------------
@@ -233,7 +233,6 @@ def getLatLon(gfn):
 #----------------------------------------------------
 
 if __name__ == '__main__':
-
     mainDir_new = '/scratch/b.legras/NWCGEO-APPLI-2018.1-8/export'
 #     mainDir_old = '/scratch/b.legras/sats/himawari/safnwc/netcdf/2017/'
     plotDir = '/scratch/erikj/Data/Nwcgeo/Compare/Plots'
@@ -424,98 +423,15 @@ if __name__ == '__main__':
     
     
     
-    #: Initiate the data
-    date = datetime(year,day,mon,hour,min)
-    dat_new = SAFNWC_CTTH(date,'msg1',BBname='SAFBox',fullname=fil_new)
-    dat_old = SAFNWC_CTTH(date,'msg1',BBname='SAFBox',fullname=fil_old)
-    #: Change to new
     
-    gg_new = geosat.GeoGrid('FullAMA_SAFBox')
-    gg_old = geosat.GeoGrid('FullAMA_SAFBox')
-    dat_new._CTTH_PRESS()
-    dat_old._CTTH_PRESS()
-#     dat.show('CTTH_PRESS')
-    p1_new = geosat.SatGrid(dat_new,gg_new)
-    p1_old = geosat.SatGrid(dat_old,gg_old)
-#     p1.var.update({'CTTH_PRESS':mask_prod_new})
-    p1_new._sat_togrid('CTTH_PRESS')
-    p1_old._sat_togrid('CTTH_PRESS')
-    import copy
-    chart(p1_new, 'CTTH_PRESS')
-    chart(p1_old, 'CTTH_PRESS')
-    p1_diff = copy.copy(p1_new)
+    gg = geosat.GeoGrid('FullAMA_SAFBox')
+    fig = plt.figure(figsize=[10, 6])
+    proj = ccrs.PlateCarree(central_longitude=0)
+    ax = fig.add_subplot(111, projection=proj)
+    ax.coastlines()
+    ax.imshow(prod_new)
+    fig.show()
     pdb.set_trace()
-    p1_diff.var['CTTH_PRESS'].data[:] = np.where((p1_new.var['CTTH_PRESS'].data==mask_prod_new.fill_value) | (p1_old.var['CTTH_PRESS'].data==mask_prod_old.fill_value), mask_prod_new.fill_value, p1_new.var['CTTH_PRESS'].data-p1_old.var['CTTH_PRESS'].data)
-#     np.where(np.isnan(prod_diff), mask_prod_new.fill_value, prod_diff)
-    chart(p1_diff, 'CTTH_PRESS')
-    print('hmm')
-    pdb.set_trace()
-    p1.chart('CTTH_PRESS')
-    pdb.set_trace()
-    p1_diff.var['CTTH_PRESS'].data
-    
-    
-    
-    
-    
-    
-    
-    
-    
-#     (Pdb) mask_prod_new
-# masked_array(
-#   data=[[--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         ...,
-#         [--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --]],
-#   mask=[[ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         ...,
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True]],
-#   fill_value=65535,
-#   dtype=float32)
-# (Pdb) dat.var['CTTH_PRESS']
-# masked_array(
-#   data=[[--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         ...,
-#         [65535.0, 65535.0, 65535.0, ..., 65535.0, 65535.0, 65535.0],
-#         [65535.0, 65535.0, 65535.0, ..., 65535.0, 65535.0, 65535.0],
-#         [65535.0, 65535.0, 65535.0, ..., 65535.0, 65535.0, 65535.0]],
-#   mask=[[ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         ...,
-#         [False, False, False, ..., False, False, False],
-#         [False, False, False, ..., False, False, False],
-#         [False, False, False, ..., False, False, False]],
-#   fill_value=65535.0,
-#   dtype=float32)
-# (Pdb) dat.copy()
-# *** AttributeError: 'SAFNWC_CTTH' object has no attribute 'copy'
-# (Pdb) import copy
-# (Pdb) copy(dat)
-# *** TypeError: 'module' object is not callable
-# (Pdb) copy.copy(dat)
-# <SAFNWCnc.SAFNWC_CTTH object at 0x7f98af2356d0>
-# (Pdb) copy.deepcopy(dat)
-# *** NotImplementedError: Dataset is not picklable
-# (Pdb) copy.deep_copy(dat)
-# *** AttributeError: module 'copy' has no attribute 'deep_copy'
-
-    
-    
-    
-    
-    
-    
     
     
     
