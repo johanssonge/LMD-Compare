@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt  # @UnresolvedImport
 sys.path.append('/home/erikj/Projects/STC/pylib')
 import geosat
 from SAFNWCnc import SAFNWC_CTTH
-from datetime import datetime
+from datetime import datetime, timedelta
 
 satConversion = {'hima08': 'himawari', 'msg1': 'msg1', 'msg3': 'msg3'}
 #----------------------------------------------------
@@ -158,7 +158,8 @@ def bars(obts,field,txt=[''], show=True, typ1='', typ2='', datum='', sat=''):
                 rang = (50, 500)
                 bins =150
             mapv = ~(plotted_field == 65535.0)
-            plotted_field = plotted_field[mapv]# / 100
+            #: hPa
+            plotted_field = plotted_field[mapv]# / 100.
 #             plotted_field = np.where(plotted_field == 65535.0, np.nan, plotted_field)
             print(1)
 #             ax.hist(plotted_field, range=rang)#, aspect=1.)
@@ -239,16 +240,16 @@ def getLatLon(gfn):
 #----------------------------------------------------
 
 if __name__ == '__main__':
-    mainDir_new = '/scratch/b.legras/NWCGEO-APPLI-2018.1-8/export'
+    mainDir_new = '/scratch/b.legras/NWCGEO-APPLI-2018.1-1/export'
 #     mainDir_old = '/scratch/b.legras/sats/himawari/safnwc/netcdf/2017/'
     plotDir = '/scratch/erikj/Data/Nwcgeo/Compare/Plots'
 #     fil = 'S_NWC_CMA_MSG1_FULLAMA-VISIR_20170515T053000Z.nc'
-    sat='HIMA08' #'MSG1'
+    sat='MSG1'# 'HIMA08' #'MSG1'
     if sat == 'HIMA08':
         sat_dir = 'himawari'
         sat_fil = 'HIMAWARI08'
     else:
-        sat_dir = sat
+        sat_dir = sat.lower()
         sat_fil = sat
     mainDir_old = '/scratch/b.legras/sats/%s/safnwc-SAFBox/netcdf' %sat_dir
     if mainDir_new.split('/')[3] == 'sats':
@@ -260,12 +261,22 @@ if __name__ == '__main__':
     else:
         typ2 = mainDir_old.split('/')[3].replace('NWCGEO-APPLI-', '')
     
+    
     p1_new_agg = []
     p1_old_agg = []
     p1_diff_agg = []
-    for date in [datetime(2017,7,22,20,0), datetime(2017,7,22,20,20), datetime(2017,7,22,21,0), \
-                datetime(2017,7,24,8,40), datetime(2017,7,24,9,0), datetime(2017,7,24,9,20), \
-                datetime(2017,7,26,15,40), datetime(2017,7,26,16,0), datetime(2017,7,26,16,20)]:
+#     all_dates = [datetime(2017,7,22,20,0), datetime(2017,7,22,20,20), datetime(2017,7,22,21,0), \
+#                 datetime(2017,7,24,8,40), datetime(2017,7,24,9,0), datetime(2017,7,24,9,20), \
+#                 datetime(2017,7,26,15,40), datetime(2017,7,26,16,0), datetime(2017,7,26,16,20)]
+    
+    st_date = datetime(2017,8,1,8,0)
+    all_dates = []
+    for d in range(10):
+        for h in range(8):
+            all_dates.append(st_date + +timedelta(days=d) + timedelta(hours=h))
+    wrong_file_new = []
+    wrong_file_old = []
+    for date in all_dates:
         year = date.year
         mon = date.month
         day = date.day
@@ -276,13 +287,24 @@ if __name__ == '__main__':
         
         product = 'CTTH'
 #     HIMAWARI08
-        files_new = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_new, product, product, sat, datum))
+        files_new_str = '%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_new, product, product, sat, datum)
+        files_new = glob.glob(files_new_str)
 #     files_old = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, product, product, sat, datum))
 #     files_old = glob.glob('%s/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%d%02d%02dT%02d%02d*.nc' %(mainDir_old, year, mon, day, product, sat, year, mon, day, hour, minut))
-        files_old = glob.glob('%s/%d/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, year, year, mon, day, product, sat_fil, datum))
+        files_old_str = '%s/%d/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, year, year, mon, day, product, sat_fil, datum)
+        files_old = glob.glob(files_old_str)
         
+        if (len(files_new) == 0) or (len(files_old) == 0):
+            if len(files_new) == 0:
+                wrong_file_new.append(files_new_str)
+            if len(files_old) == 0:
+                wrong_file_old.append(files_old_str)
+            pdb.set_trace()
+            continue
+            
         files_new.sort()
         files_old.sort()
+        
         fil_new = files_new[0]
         fil_old = files_old[0]
 #     filename = mainDir + '/' + fil
@@ -307,30 +329,30 @@ if __name__ == '__main__':
         ncf_new.close()
         lat, lon = getLatLon(sfn)
     #     pdb.set_trace()
-        #: Plotting    
-        fig = plt.figure()
-        ax = fig.add_subplot(3,1,1)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
-    #     ax.coastlines()
-        im = ax.imshow(prod_new)#, extent=(np.nanmin(lon), np.nanmin(lon), np.nanmin(lat), np.nanmin(lat)))#transform=ccrs.Geostationary(satellite_height=35786000))
-        cbar = fig.colorbar(im)
-        ax.set_title('2018')
-        
-        ax = fig.add_subplot(3,1,2)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
-        im = ax.imshow(prod_old)
-        cbar = fig.colorbar(im)
-        ax.set_title('2016')
-        prod_diff = prod_new - prod_old
-        ax = fig.add_subplot(3,1,3)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
-        im = ax.imshow((prod_diff), cmap='RdBu_r')
-        cbar = fig.colorbar(im)#, orientation='horizontal', cax=cbar_ax, ticks=barticks)  # @UnusedVariable
-        ax.set_title('2018 - 2016')
-        
-        plt.tight_layout()
+        if False:
+            #: Plotting    
+            fig = plt.figure()
+            ax = fig.add_subplot(3,1,1)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
+        #     ax.coastlines()
+            im = ax.imshow(prod_new)#, extent=(np.nanmin(lon), np.nanmin(lon), np.nanmin(lat), np.nanmin(lat)))#transform=ccrs.Geostationary(satellite_height=35786000))
+            cbar = fig.colorbar(im)
+            ax.set_title('2018')
+            
+            ax = fig.add_subplot(3,1,2)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
+            im = ax.imshow(prod_old)
+            cbar = fig.colorbar(im)
+            ax.set_title('2016')
+            prod_diff = prod_new - prod_old
+            ax = fig.add_subplot(3,1,3)#, projection=ccrs.Miller(central_longitude=180.0))#projection=ccrs.PlateCarree())
+            im = ax.imshow((prod_diff), cmap='RdBu_r')
+            cbar = fig.colorbar(im)#, orientation='horizontal', cax=cbar_ax, ticks=barticks)  # @UnusedVariable
+            ax.set_title('2018 - 2016')
+            
+            plt.tight_layout()
     
 #     figname = '%s/%s_%s' %(plotDir, nc_prod, datum)
 #     fig.savefig(figname + '.png')
 #     fig.show()
-    
     
     
         #: Initiate the data
@@ -350,14 +372,15 @@ if __name__ == '__main__':
         p1_old._sat_togrid(grid_type)
     #     chart(p1_old, 'CTTH_PRESS')
         valid_mask = ~((p1_new.var[grid_type].data==mask_prod_new.fill_value) | (p1_old.var[grid_type].data==mask_prod_old.fill_value))
-        p1_new_valid = p1_new.var[grid_type].data[valid_mask]
-        p1_old_valid = p1_old.var[grid_type].data[valid_mask]
-        p1_diff_valid = p1_new_valid-p1_old_valid
+#         p1_new_valid = p1_new.var[grid_type].data[valid_mask]
+#         p1_old_valid = p1_old.var[grid_type].data[valid_mask]
+#         p1_diff_valid = p1_new_valid-p1_old_valid
         p1_diff_var = np.where(valid_mask, p1_new.var[grid_type].data-p1_old.var[grid_type].data, mask_prod_new.fill_value)
         p1_diff = {grid_type: p1_diff_var}
     #     np.where(np.isnan(prod_diff), mask_prod_new.fill_value, prod_diff)
-        bars([p1_new, p1_old, p1_diff], grid_type, txt=[typ1, typ2, 'Diff'], show=True, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
-        chart([p1_new, p1_old, p1_diff], grid_type,clim=[70.,150.], txt=[typ1, typ2, 'Diff'], show=True, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
+        if len(all_dates) >= 3:    
+            bars([p1_new, p1_old, p1_diff], grid_type, txt=[typ1, typ2, 'Diff'], show=True, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
+            chart([p1_new, p1_old, p1_diff], grid_type,clim=[70.,150.], txt=[typ1, typ2, 'Diff'], show=True, typ1=typ1, typ2=typ2, datum=datum, sat=sat)
         #: Aggregate
         p1_new_agg.extend(p1_new.var[grid_type].data)
         p1_old_agg.extend(p1_old.var[grid_type].data)
@@ -373,57 +396,6 @@ if __name__ == '__main__':
     
     
     
-    
-    
-    
-#     (Pdb) mask_prod_new
-# masked_array(
-#   data=[[--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         ...,
-#         [--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --]],
-#   mask=[[ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         ...,
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True]],
-#   fill_value=65535,
-#   dtype=float32)
-# (Pdb) dat.var['CTTH_PRESS']
-# masked_array(
-#   data=[[--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         [--, --, --, ..., --, --, --],
-#         ...,
-#         [65535.0, 65535.0, 65535.0, ..., 65535.0, 65535.0, 65535.0],
-#         [65535.0, 65535.0, 65535.0, ..., 65535.0, 65535.0, 65535.0],
-#         [65535.0, 65535.0, 65535.0, ..., 65535.0, 65535.0, 65535.0]],
-#   mask=[[ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         [ True,  True,  True, ...,  True,  True,  True],
-#         ...,
-#         [False, False, False, ..., False, False, False],
-#         [False, False, False, ..., False, False, False],
-#         [False, False, False, ..., False, False, False]],
-#   fill_value=65535.0,
-#   dtype=float32)
-# (Pdb) dat.copy()
-# *** AttributeError: 'SAFNWC_CTTH' object has no attribute 'copy'
-# (Pdb) import copy
-# (Pdb) copy(dat)
-# *** TypeError: 'module' object is not callable
-# (Pdb) copy.copy(dat)
-# <SAFNWCnc.SAFNWC_CTTH object at 0x7f98af2356d0>
-# (Pdb) copy.deepcopy(dat)
-# *** NotImplementedError: Dataset is not picklable
-# (Pdb) copy.deep_copy(dat)
-# *** AttributeError: module 'copy' has no attribute 'deep_copy'
-
     
     
     
