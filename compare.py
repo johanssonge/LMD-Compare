@@ -132,7 +132,7 @@ def chart(obts,field,cmap='jet',clim=[180.,300.],txt=[''],subgrid=None, block=Tr
         return ax
 
 
-def bars(obts,field,txt=[''], show=True, datum='', sat='', v2018s=None):
+def bars(obts,field,clim=[180.,300.],txt=[''], show=True, datum='', sat='', v2018s=None, days=1, hours=1):
         if isinstance(obts, dict) and (v2018s is not None):
             obts_use = []
             txt = []
@@ -141,23 +141,31 @@ def bars(obts,field,txt=[''], show=True, datum='', sat='', v2018s=None):
                 txt.append('v2018-%d' %v)
             obts_use.append(np.asarray(obts['v2016_diff_agg']))
             txt.append('v2016')
-            figname_txt = 'v2018s'
+            figname_txt = 'v2018s_%s' %datum
         elif not isinstance(obts, list):
             obts_use = [obts]
-            figname_txt = '%s_%s' %(txt[0], txt[1])
+            figname_txt = '%s_%s_%s' %(txt[0], txt[1], datum)
             
         else:
             obts_use = obts
-            figname_txt = '%s_%s' %(txt[0], txt[1])
+            figname_txt = '%s_%s_%s' %(txt[0], txt[1], datum)
+            
         # test existence of key field
 #         pdb.set_trace()
 #         if field not in obt_t.var.keys():
 #             print ('undefined field')
 #             return
         
+        suptitle_txt = '%s, %s, %s' %(sat, field, datum)
+        if days > 1:
+            suptitle_txt = suptitle_txt + ', days=%d' %days
+            figname_txt= figname_txt + '_d%d' %days
+        if hours > 1:
+            suptitle_txt = suptitle_txt + ', hours=%d' %hours
+            figname_txt = figname_txt + '_h%d' %hours
         fz = (11, len(v2018s)*4)#, 4)
         fig = plt.figure(figsize=fz)
-        fig.suptitle('%s, %s, %s' %(sat, field, datum))
+        fig.suptitle(suptitle_txt)
         fs = 15
         for f, obt in enumerate(obts_use):
             ax = fig.add_subplot(len(obts_use), 1, f+1)
@@ -169,10 +177,10 @@ def bars(obts,field,txt=[''], show=True, datum='', sat='', v2018s=None):
                 plotted_field = obt.var[field].data[:]
             if (txt[f] == 'Diff') or ((v2018s is not None) and (f > 0)):
                 rang = (-30, 30)
-                bins=20
+                bins = 100
             else:
-                rang = (50, 500)
-                bins =150
+                rang = (clim[0], clim[1])
+                bins = 150
             mapv = ~(plotted_field == 65535.0)
             #: hPa
             try:
@@ -209,7 +217,7 @@ def bars(obts,field,txt=[''], show=True, datum='', sat='', v2018s=None):
 # #             cbar=fig.colorbar(im)#, cax=pos_cax)
 #             cbar.ax.tick_params(labelsize=fs)
         plt.tight_layout()
-        figname = '/scratch/erikj/Proj1/Plots/hist_diff_%s_%s_%s_%s' %(sat, field, figname_txt, datum)
+        figname = '/scratch/erikj/Proj1/Plots/hist_diff_%s_%s_%s' %(sat, field, figname_txt)
         fig.savefig(figname + '.png')
         if show:
             fig.show()
@@ -262,8 +270,7 @@ if __name__ == '__main__':
 #     fil = 'S_NWC_CMA_MSG1_FULLAMA-VISIR_20170515T053000Z.nc'
     sat='MSG1'# 'HIMA08' #'MSG1'
     product = 'CTTH'
-    min_height = 500
-    max_height = 0
+    clim=[0.,500.]
     if sat == 'HIMA08':
         sat_dir = 'himawari'
         sat_fil = 'HIMAWARI08'
@@ -284,7 +291,6 @@ if __name__ == '__main__':
     if nc_prod == 'ctth':
         nc_prod = 'ctth_pres'
         grid_type = 'CTTH_PRESS'
-    
     p1_new_agg = []
     p1_old_agg = []
     p1_diff_agg = []
@@ -292,17 +298,26 @@ if __name__ == '__main__':
 #                 datetime(2017,7,24,8,40), datetime(2017,7,24,9,0), datetime(2017,7,24,9,20), \
 #                 datetime(2017,7,26,15,40), datetime(2017,7,26,16,0), datetime(2017,7,26,16,20)]
     #: Start date
-    st_date = datetime(2017,8,1,8,0)
+    st_date = datetime(2017,8,3,8,0)
+    st_datum = st_date.isoformat().replace('-', '').replace(':', '')[0:-2]
+    
     all_dates = []
     #: Add days
-    for d in range(10):
+    nrdays = 10
+    nrhours = 8
+    for d in range(nrdays):
         #: Add hours
-        for h in range(8):
+        for h in range(nrhours):
             all_dates.append(st_date + timedelta(days=d) + timedelta(hours=h))
     #: List for wrong files
     wrong_files = []
     #: 2018 versions
-    v_2018 = [1,2,3,4,5,6,7,8,9,10,11,12,13]
+    if sat == 'MSG1':
+        v_2018 = list(range(1,13+1,2))
+    elif sat == 'HIMA08':
+        v_2018 = list(range(2,10+1,2))
+    
+#     v_2018 = [1,2,3,4,5,6,7,8,9,10,11,12,13]
     v_0 = v_2018[0]
     #: Dict for results.
     results = {}
@@ -350,8 +365,8 @@ if __name__ == '__main__':
             
             results['v2018-%d_p1' %v] = v2018_p1
             v2018_valid_mask = ((v2018_p1.var[grid_type].data != v2018_maskprod.fill_value) & \
-                                (v2018_p1.var[grid_type].data <= min_height) & \
-                                (v2018_p1.var[grid_type].data >= max_height))
+                                (v2018_p1.var[grid_type].data >= clim[0]) & \
+                                (v2018_p1.var[grid_type].data <= clim[1]))
             
             if v == v_0:
                 results.update({'v2018-%d_fill_value' %v_0: v2018_maskprod.fill_value})
@@ -371,8 +386,8 @@ if __name__ == '__main__':
             plot_single = False
             if plot_single:    
                 p1_diff = {grid_type: p1_diff_var}
-                bars([results['v2018-%d_p1' %v_0], v2018_p1, p1_diff], grid_type, txt=['v2018.1-%d' %v_0, 'v2018.1-%d' %v, 'Diff'], show=True, datum=datum, sat=sat)
-                chart([results['v2018-%d_p1' %v_0], v2018_p1, p1_diff], grid_type,clim=[70.,150.], txt=['v2018.1-%d' %v_0, 'v2018.1-%d' %v, 'Diff'], show=True, datum=datum, sat=sat)
+                bars([results['v2018-%d_p1' %v_0], v2018_p1, p1_diff], grid_type,clim=clim, txt=['v2018.1-%d' %v_0, 'v2018.1-%d' %v, 'Diff'], show=True, datum=datum, sat=sat)
+                chart([results['v2018-%d_p1' %v_0], v2018_p1, p1_diff], grid_type,clim=clim, txt=['v2018.1-%d' %v_0, 'v2018.1-%d' %v, 'Diff'], show=True, datum=datum, sat=sat)
             
 #     files_old = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, product, product, sat, datum))
 #     files_old = glob.glob('%s/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%d%02d%02dT%02d%02d*.nc' %(mainDir_old, year, mon, day, product, sat, year, mon, day, hour, minut))
@@ -403,8 +418,8 @@ if __name__ == '__main__':
         
         results['v2016_p1'] = v2016_p1
         v2016_valid_mask = ((v2016_p1.var[grid_type].data != v2016_maskprod.fill_value) & \
-                                (v2016_p1.var[grid_type].data <= min_height) & \
-                                (v2016_p1.var[grid_type].data >= max_height)) 
+                                (v2016_p1.var[grid_type].data >= clim[0]) & \
+                                (v2016_p1.var[grid_type].data <= clim[1])) 
         valid_mask = ((results['v2018-%d_valid_mask' %v_0]) & (v2016_valid_mask))
 #         p1_diff_var = np.where(valid_mask, 
 #                                results['v2018-%d_p1' %v_0].var[grid_type].data - v2016_p1.var[grid_type].data, 
@@ -415,8 +430,8 @@ if __name__ == '__main__':
         plot_single = False
         if plot_single:
             p1_diff = {grid_type: p1_diff_var}
-            bars([results['v2018-%d_p1' %v_0], v2016_p1, p1_diff], grid_type, txt=['v2018.1-%d' %v_0, 'v2016', 'Diff'], show=True, datum=datum, sat=sat)
-            chart([results['v2018-%d_p1' %v_0], v2016_p1, p1_diff], grid_type,clim=[70.,150.], txt=['v2018.1-%d' %v_0, 'v2016', 'Diff'], show=True, datum=datum, sat=sat)
+            bars([results['v2018-%d_p1' %v_0], v2016_p1, p1_diff], grid_type,clim=clim, txt=['v2018.1-%d' %v_0, 'v2016', 'Diff'], show=True, datum=datum, sat=sat)
+            chart([results['v2018-%d_p1' %v_0], v2016_p1, p1_diff], grid_type,clim=clim, txt=['v2018.1-%d' %v_0, 'v2016', 'Diff'], show=True, datum=datum, sat=sat)
 
         
     #     pdb.set_trace()
@@ -450,7 +465,7 @@ if __name__ == '__main__':
 #     p1_new_agg_dict = {grid_type: p1_new_agg}
 #     p1_old_agg_dict = {grid_type: p1_old_agg}
 #     p1_diff_agg_dict = {grid_type: p1_diff_agg}
-    bars(results, grid_type, txt=[typ1, typ2, 'Diff'], show=True, sat=sat, v2018s=v_2018)
+    bars(results, grid_type,clim=clim, txt=[typ1, typ2, 'Diff'], show=True, datum=st, sat=sat, v2018s=v_2018, days=nrdays, hours=nrhours)
     pdb.set_trace()
     
     sys.exit()
