@@ -18,6 +18,8 @@ import sys
 # except ImportError:
 #     from urllib.request import urlopen
 # from io import BytesIO
+import matplotlib  # @UnresolvedImport
+# matplotlib.use('Agg')
 import cartopy.crs as ccrs  # @UnresolvedImport
 from cartopy import feature  # @UnresolvedImport
 import matplotlib.pyplot as plt  # @UnresolvedImport
@@ -132,7 +134,15 @@ def chart(obts,field,cmap='jet',clim=[180.,300.],txt=[''],subgrid=None, block=Tr
         return ax
 
 
-def bars(obts,field,clim=[180.,300.],txt=[''], show=True, datum='', sat='', v2018s=None, days=1, hours=1):
+def bars(obts,field,pDir='./Plots',clim=[180.,300.],txt=[''], show=True, datum='', sat='', v2018s=None, days=1, hours=1, fn='All'):
+        v2018title = {'v2018-1': 'v2018-1 - 1h ERA5', 
+                      'v2018-3': 'v2018-3 - 3h ERA5', 
+                      'v2018-5': 'v2018-5 - 1h ERA5, No TP', 
+                      'v2018-7': 'v2018-7 - 1h ERA5, No TP, Red PL', 
+                      'v2018-9': 'v2018-9 - 1h ERA5, WMO TP', 
+                      'v2018-11': 'v2018-11 - 1h ERA5, WMO TP', 
+                      'v2018-13': 'v2018-13 - 1h ERA5, WMO TP', 
+                      'v2016': 'v2016'}
         if isinstance(obts, dict) and (v2018s is not None):
             obts_use = []
             txt = []
@@ -163,7 +173,10 @@ def bars(obts,field,clim=[180.,300.],txt=[''], show=True, datum='', sat='', v201
         if hours > 1:
             suptitle_txt = suptitle_txt + ', hours=%d' %hours
             figname_txt = figname_txt + '_h%d' %hours
-        fz = (11, len(v2018s)*4)#, 4)
+        if fn != 'All':
+            suptitle_txt = suptitle_txt + ', method=%s' %fn.replace(' ', '-').replace('_', '-')
+            figname_txt = figname_txt + '_%s' %fn.replace(' ', '-').replace('_', '-').lower()
+        fz = (11, len(v2018s)*4) #, 4)
         fig = plt.figure(figsize=fz)
         fig.suptitle(suptitle_txt)
         fs = 15
@@ -190,7 +203,11 @@ def bars(obts,field,clim=[180.,300.],txt=[''], show=True, datum='', sat='', v201
 #             plotted_field = np.where(plotted_field == 65535.0, np.nan, plotted_field)
 #             ax.hist(plotted_field, range=rang)#, aspect=1.)
             ax.hist(plotted_field, bins=bins, range=rang)#, aspect=1.)
-            ax.set_title(txt[f],fontsize=fs)
+            if txt[f] in v2018title.keys():
+                subtitle = v2018title[txt[f]]
+            else:
+                subtitle = txt[f]
+            ax.set_title(subtitle,fontsize=fs)
 #             if f in [0,1]:
 #             ax.set_ylim((0, 150))
 #             ax.set_yticks([0, 50, 100, 150])
@@ -216,14 +233,21 @@ def bars(obts,field,clim=[180.,300.],txt=[''], show=True, datum='', sat='', v201
 #             cbar = fig.colorbar(im, orientation='vertical', cax=cbar_ax, ticks=barticks)  # @UnusedVariable
 # #             cbar=fig.colorbar(im)#, cax=pos_cax)
 #             cbar.ax.tick_params(labelsize=fs)
-        plt.tight_layout()
-        figname = '/scratch/erikj/Proj1/Plots/hist_diff_%s_%s_%s' %(sat, field, figname_txt)
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        figname = '%s/hist_diff_%s_%s_%s_clim-%d-%d' %(pDir, sat, field, figname_txt, int(clim[0]), int(clim[1]))
         fig.savefig(figname + '.png')
         if show:
             fig.show()
             pdb.set_trace()
         return ax
 
+
+def createClimMask(data, clim_min, clim_max, fill_val):
+    #:Create a mask that removes unused data and data outside clim
+    valid_mask = ((data != fill_val) & \
+                  (data >= clim_min) & \
+                  (data < clim_max))
+    return valid_mask
 
 
 def saveLatLon(ncf, fn):
@@ -232,7 +256,6 @@ def saveLatLon(ncf, fn):
     satname = basename.split('_')[3].lower()
     sfn = '%s/%s_LonLat.h5' %(LatLonDir, satname)
     if not os.path.isfile(sfn):
-        pdb.set_trace()
         lon = ncf['lon'][:].data
         lat = ncf['lat'][:].data
         f = h5py.File(sfn, 'w')
@@ -264,13 +287,33 @@ def getLatLon(gfn):
 #----------------------------------------------------
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c0","--clim-min", type=int, default=0,  
+                        help="Min clim. Default=0")
+    parser.add_argument("-c1","--clim-max", type=int, default=500, 
+                        help="Max clim. Default=500")
+    parser.add_argument("-fn","--method-name", type=str, default='All', 
+                        help="name of the method used. Default=All")
+    parser.add_argument("-fm","--method-flag", action="store_true", default=False, 
+                        help="Do not show figure. Default=True (i.e. show figure)")
+    parser.add_argument("-s","--show", action="store_false", default=True, 
+                        help="Do not show figure. Default=True (i.e. show figure)")
+   
+    args = parser.parse_args()
+    clim_min = args.clim_min
+    clim_max = args.clim_max
+    fname = args.method_name
+    fm = args.method_flag
     mainDir_new = '/scratch/b.legras/NWCGEO-APPLI-2018.1-x/export'
 #     mainDir_old = '/scratch/b.legras/sats/himawari/safnwc/netcdf/2017/'
-    plotDir = '/scratch/erikj/Data/Nwcgeo/Compare/Plots'
+    plotDir = '/scratch/erikj/Proj1/Plots' #/Meting' #'/scratch/erikj/Data/Nwcgeo/Compare/Plots'
+    if not os.path.isdir(plotDir):
+        os.makedirs(plotDir)
 #     fil = 'S_NWC_CMA_MSG1_FULLAMA-VISIR_20170515T053000Z.nc'
     sat='MSG1'# 'HIMA08' #'MSG1'
     product = 'CTTH'
-    clim=[0.,500.]
+    clim=[float(clim_min), float(clim_max)]
     if sat == 'HIMA08':
         sat_dir = 'himawari'
         sat_fil = 'HIMAWARI08'
@@ -298,13 +341,14 @@ if __name__ == '__main__':
 #                 datetime(2017,7,24,8,40), datetime(2017,7,24,9,0), datetime(2017,7,24,9,20), \
 #                 datetime(2017,7,26,15,40), datetime(2017,7,26,16,0), datetime(2017,7,26,16,20)]
     #: Start date
-    st_date = datetime(2017,8,3,8,0)
+    st_date = datetime(2017,8,23,0,0)
     st_datum = st_date.isoformat().replace('-', '').replace(':', '')[0:-2]
     
     all_dates = []
     #: Add days
-    nrdays = 10
-    nrhours = 8
+    nrdays = 1#10
+    nrhours = 24
+    nrkvart = 24*4
     for d in range(nrdays):
         #: Add hours
         for h in range(nrhours):
@@ -313,11 +357,19 @@ if __name__ == '__main__':
     wrong_files = []
     #: 2018 versions
     if sat == 'MSG1':
-        v_2018 = list(range(1,13+1,2))
+        v_2018 = list(range(1,7+1,2))
+        if st_date < datetime(2017, 7, 1, 0, 0):
+            v_2018.append(9)
+        elif st_date < datetime(2017, 8, 1, 0, 0):
+            v_2018.append(13)
+        else:
+            v_2018.append(11)
+        v_2018.append(15)
+        v_2018.append(17)
+#         v_2018 = [1, 3, 5, 7, 11, 13]
     elif sat == 'HIMA08':
         v_2018 = list(range(2,10+1,2))
     
-#     v_2018 = [1,2,3,4,5,6,7,8,9,10,11,12,13]
     v_0 = v_2018[0]
     #: Dict for results.
     results = {}
@@ -328,7 +380,31 @@ if __name__ == '__main__':
     results.update({'v2016_p1': ''})
     results.update({'v2016_diff': ''})
     results.update({'v2016_diff_agg': []})
-
+    if (fname != 'All') and (fname not in np.asarray(['Cloud-free', 'No_reliable_method', 'Opaque_cloud_RTTOV_not_available', 'Opaque_cloud_using_RTTOV', 'Opaque_cloud_using_RTTOV_in_case_thermal_inversion', 'Intercept_method_108um_134um', 'Intercept_method_108um_62um', 'Intercept_method_108um_70um', 'Intercept_method_108um_73um', 'Radiance_ratioing_method_108um_134um', 'Radiance_ratioing_method_108um_62um', 'Radiance_ratioing_method_108um_70um', 'Radiance_ratioing_method_108um_73um', 'Spatial_smoothing'])):
+        print('%s is not a valid method name!' %fname)
+        sys.exit()
+    print('Method name = %s' %fname)
+    if fm:
+        plotDir = plotDir + '/FM'
+        fname = 'All'
+        v_2018 = [v_0]
+        methodDic = {}
+        qualityDic = {}
+#     fname = 'Cloud-free'
+#     fname = 'No_reliable_method' 1
+#     fname = 'Opaque_cloud_RTTOV_not_available' 2
+#     fname = 'Opaque_cloud_using_RTTOV' 3 R
+#     fname = 'Opaque_cloud_using_RTTOV_in_case_thermal_inversion' 4
+#     fname = 'Intercept_method_108um_134um' 5 R
+#     fname = 'Intercept_method_108um_62um' 6 R
+#     fname = 'Intercept_method_108um_70um' 7
+#     fname = 'Intercept_method_108um_73um' 8 R
+#     fname = 'Radiance_ratioing_method_108um_134um' 9 R
+#     fname = 'Radiance_ratioing_method_108um_62um' 10 R
+#     fname = 'Radiance_ratioing_method_108um_70um' 11
+#     fname = 'Radiance_ratioing_method_108um_73um' 12 R
+#     fname = 'Spatial_smoothing' 13
+    a = 0
     for date in all_dates:
         year = date.year
         mon = date.month
@@ -340,6 +416,9 @@ if __name__ == '__main__':
 #         datum = '%d%02d%02dT%02d%02d' %(year, mon, day, hour, minut)
         #: V2018
         for v in v_2018:
+            a = a + 1
+            if v == 9:
+                continue
             print('2018.1-%d' %v)
             v2018_filestr = ('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_new, product, product, sat, datum)).replace('2018.1-x', '2018.1-%d' %v)
             v2018_filedic = glob.glob(v2018_filestr)
@@ -352,34 +431,83 @@ if __name__ == '__main__':
             #: Read the required data
             v2018_maskprod = v2018_ncf[nc_prod][:]
             v2018_prod = v2018_maskprod.data.astype(float)
-            v2018_prod[v2018_ncf[nc_prod][:].mask] = np.nan
+            v2018_prod[v2018_ncf[nc_prod][:].mask] =v2018_maskprod.fill_value
             v2018_ncf.close()
             #: --- New Grid ---
             #: Initiate the data
             v2018_data = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=v2018_file)
+            v2018_data_flag = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=v2018_file)
+            flag_meaning = v2018_data_flag.ncid.variables['ctth_method'].flag_meanings.split()
+            flag_values = v2018_data_flag.ncid.variables['ctth_method'].flag_values
+            flag_data = v2018_data_flag.ncid.variables['ctth_method'][:].data
+            qual_meaning = v2018_data_flag.ncid.variables['ctth_quality'].flag_meanings.split()
+            #: ['nodata', 'internal_consistency', 'temporal_consistency', 'good', 'questionable', 'bad', 'interpolated']
+            qual_values = v2018_data_flag.ncid.variables['ctth_quality'].flag_values
+            #: array([ 1,  2,  4,  8, 16, 24, 32]
+            qual_data = v2018_data_flag.ncid.variables['ctth_quality'][:].data
+#             for i in range(len(flag_values)):
+                
+            if fname == 'All':
+                fmask = np.zeros(flag_data.shape).astype(bool)
+            else:
+                fi = np.where(np.asarray(flag_meaning)==fname)[0][0]
+                fval = flag_values[fi]
+                fmask = ~(flag_data == fval)
+#             qmaks = (qual_data == qual_values[2+3]) | (qual_data == qual_values[2+2])  | (qual_data == qual_values[2+4])
+#             mask = qmaks | fmask
+            mask = fmask
+            v2018_data._CTTH_PRESS()
+            v2018_data.var['CTTH_PRESS'].data[mask] = v2018_maskprod.fill_value
+
             #: Change to new grid
             v2018_gg = geosat.GeoGrid('FullAMA_SAFBox')
-            v2018_data._CTTH_PRESS()
             v2018_p1 = geosat.SatGrid(v2018_data, v2018_gg)
             v2018_p1._sat_togrid(grid_type)
+            #: Decide which one to use
+            if fm:
+                #: hPa
+                use_data = np.where(v2018_prod != v2018_maskprod.fill_value, 
+                                    v2018_prod / 100, 
+                                    v2018_prod)
+            else:
+                use_data = v2018_p1.var[grid_type].data
+            #: Add to results
+            results['v2018-%d_p1' %v] = use_data
             
-            results['v2018-%d_p1' %v] = v2018_p1
-            v2018_valid_mask = ((v2018_p1.var[grid_type].data != v2018_maskprod.fill_value) & \
-                                (v2018_p1.var[grid_type].data >= clim[0]) & \
-                                (v2018_p1.var[grid_type].data <= clim[1]))
+            #: Create mask width valid data
             
+            v2018_valid_mask = createClimMask(use_data, 
+                                              clim[0], clim[1], 
+                                              v2018_maskprod.fill_value)
             if v == v_0:
                 results.update({'v2018-%d_fill_value' %v_0: v2018_maskprod.fill_value})
                 results.update({'v2018-%d_valid_mask' %v_0: v2018_valid_mask})
                 #: Not diff for v_0
-                p1_diff_var = v2018_p1.var[grid_type].data[v2018_valid_mask]
+                p1_diff_var = use_data[v2018_valid_mask]
                 results['v2018-%d_diff_agg' %v].extend(p1_diff_var)
+                if fm:
+                    if (a == 1):
+                        #: initiate
+                        for namn in flag_meaning:
+                            methodDic.update({namn: 0})
+                        for namn in qual_meaning:
+                            qualityDic.update({namn: 0})
+                    for i in range(len(flag_meaning)):
+                        namn = flag_meaning[i]
+                        val = flag_values[i]
+                        num = (flag_data[v2018_valid_mask] == val).sum()
+                        methodDic[namn] = methodDic[namn] + num
+                    for i in range(len(qual_meaning)):
+                        namn = qual_meaning[i]
+                        val = qual_values[i]
+                        num = (qual_data[v2018_valid_mask] == val).sum()
+                        qualityDic[namn] = qualityDic[namn] + num
                 continue
             valid_mask = ((results['v2018-%d_valid_mask' %v_0]) & (v2018_valid_mask))
 #             p1_diff_var = np.where(valid_mask, 
 #                                    results['v2018-%d_p1' %v_0].var[grid_type].data - v2018_p1.var[grid_type].data, 
 #                                    v2018_maskprod.fill_value)
-            p1_diff_var = results['v2018-%d_p1' %v_0].var[grid_type].data[valid_mask] - v2018_p1.var[grid_type].data[valid_mask]
+            p1_diff_var = results['v2018-%d_p1' %v_0][valid_mask] - use_data[valid_mask]
             #: Aggregate
             results['v2018-%d_diff_agg' %v].extend(p1_diff_var)
             
@@ -391,48 +519,63 @@ if __name__ == '__main__':
             
 #     files_old = glob.glob('%s/%s/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, product, product, sat, datum))
 #     files_old = glob.glob('%s/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%d%02d%02dT%02d%02d*.nc' %(mainDir_old, year, mon, day, product, sat, year, mon, day, hour, minut))
-        v2016_filestr = '%s/%d/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, year, year, mon, day, product, sat_fil, datum)
-        v2016_filedic = glob.glob(v2016_filestr)
-        if len(v2016_filedic) == 0:
-            wrong_files.append(v2016_filestr)
-            continue
-        v2016_filedic.sort()
-        v2016_file = v2016_filedic[0]
-        v2016_ncf = nc.Dataset(v2016_file)
-        #: Read the required data
-        v2016_maskprod = v2016_ncf[nc_prod][:]
-        v2016_prod = v2016_maskprod.data.astype(float)
-        v2016_prod[v2016_ncf[nc_prod][:].mask] = np.nan
-        #: Take care of latitude and longitude
-        sfn = saveLatLon(v2016_ncf, v2016_file)
-        lat, lon = getLatLon(sfn)
-        v2016_ncf.close()
-        #: --- New Grid ---
-        #: Initiate the data
-        v2016_data = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=v2016_file)
-        #: Change to new grid
-        v2016_gg = geosat.GeoGrid('FullAMA_SAFBox')
-        v2016_data._CTTH_PRESS()
-        v2016_p1 = geosat.SatGrid(v2016_data, v2016_gg)
-        v2016_p1._sat_togrid(grid_type)
-        
-        results['v2016_p1'] = v2016_p1
-        v2016_valid_mask = ((v2016_p1.var[grid_type].data != v2016_maskprod.fill_value) & \
-                                (v2016_p1.var[grid_type].data >= clim[0]) & \
-                                (v2016_p1.var[grid_type].data <= clim[1])) 
-        valid_mask = ((results['v2018-%d_valid_mask' %v_0]) & (v2016_valid_mask))
-#         p1_diff_var = np.where(valid_mask, 
-#                                results['v2018-%d_p1' %v_0].var[grid_type].data - v2016_p1.var[grid_type].data, 
-#                                v2016_maskprod.fill_value)
-        p1_diff_var = results['v2018-%d_p1' %v_0].var[grid_type].data[valid_mask] - v2016_p1.var[grid_type].data[valid_mask]
-        #: Aggregate
-        results['v2016_diff_agg'].extend(p1_diff_var)
-        plot_single = False
-        if plot_single:
-            p1_diff = {grid_type: p1_diff_var}
-            bars([results['v2018-%d_p1' %v_0], v2016_p1, p1_diff], grid_type,clim=clim, txt=['v2018.1-%d' %v_0, 'v2016', 'Diff'], show=True, datum=datum, sat=sat)
-            chart([results['v2018-%d_p1' %v_0], v2016_p1, p1_diff], grid_type,clim=clim, txt=['v2018.1-%d' %v_0, 'v2016', 'Diff'], show=True, datum=datum, sat=sat)
-
+        if not fm:
+            print('2016')
+            v2016_filestr = '%s/%d/%d_%02d_%02d/S_NWC_%s_%s_FULLAMA-*_%s*.nc' %(mainDir_old, year, year, mon, day, product, sat_fil, datum)
+            v2016_filedic = glob.glob(v2016_filestr)
+            if len(v2016_filedic) == 0:
+                wrong_files.append(v2016_filestr)
+                continue
+            v2016_filedic.sort()
+            v2016_file = v2016_filedic[0]
+            v2016_ncf = nc.Dataset(v2016_file)
+            #: Read the required data
+            v2016_maskprod = v2016_ncf[nc_prod][:]
+            v2016_prod = v2016_maskprod.data.astype(float)
+            v2016_prod[v2016_ncf[nc_prod][:].mask] = np.nan
+            #: Take care of latitude and longitude
+            sfn = saveLatLon(v2016_ncf, v2016_file)
+            lat, lon = getLatLon(sfn)
+            v2016_ncf.close()
+            #: --- New Grid ---
+            #: Initiate the data
+            v2016_data = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=v2016_file)
+            v2016_data_flag = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=v2018_file)
+            flag_meaning = v2016_data_flag.ncid.variables['ctth_method'].flag_meanings.split()
+            flag_values = v2016_data_flag.ncid.variables['ctth_method'].flag_values
+            flag_data = v2016_data_flag.ncid.variables['ctth_method'][:].data
+            if fname == 'All':
+                fmask = np.zeros(flag_data.shape).astype(bool)
+            else:
+                fi = np.where(np.asarray(flag_meaning)==fname)[0][0]
+                fval = flag_values[fi]
+                fmask = ~(flag_data == fval)
+            
+            #: Change to new grid
+            v2016_gg = geosat.GeoGrid('FullAMA_SAFBox')
+            v2016_data._CTTH_PRESS()
+            v2016_data.var['CTTH_PRESS'].data[fmask] = v2016_maskprod.fill_value
+            v2016_p1 = geosat.SatGrid(v2016_data, v2016_gg)
+            v2016_p1._sat_togrid(grid_type)
+            
+            results['v2016_p1'] = v2016_p1
+            v2016_valid_mask = ((v2016_p1.var[grid_type].data != v2016_maskprod.fill_value) & \
+                                    (v2016_p1.var[grid_type].data >= clim[0]) & \
+                                    (v2016_p1.var[grid_type].data <= clim[1])) 
+            valid_mask = ((results['v2018-%d_valid_mask' %v_0]) & (v2016_valid_mask))
+    #         p1_diff_var = np.where(valid_mask, 
+    #                                results['v2018-%d_p1' %v_0].var[grid_type].data - v2016_p1.var[grid_type].data, 
+    #                                v2016_maskprod.fill_value)
+#             p1_diff_var = results['v2018-%d_p1' %v_0].var[grid_type].data[valid_mask] - v2016_p1.var[grid_type].data[valid_mask]
+            p1_diff_var = results['v2018-%d_p1' %v_0][valid_mask] - v2016_p1.var[grid_type].data[valid_mask]
+            #: Aggregate
+            results['v2016_diff_agg'].extend(p1_diff_var)
+            plot_single = False
+            if plot_single:
+                p1_diff = {grid_type: p1_diff_var}
+                bars([results['v2018-%d_p1' %v_0], v2016_p1, p1_diff], grid_type,clim=clim, txt=['v2018.1-%d' %v_0, 'v2016', 'Diff'], show=True, datum=datum, sat=sat)
+                chart([results['v2018-%d_p1' %v_0], v2016_p1, p1_diff], grid_type,clim=clim, txt=['v2018.1-%d' %v_0, 'v2016', 'Diff'], show=True, datum=datum, sat=sat)
+    
         
     #     pdb.set_trace()
         if False:
@@ -465,8 +608,64 @@ if __name__ == '__main__':
 #     p1_new_agg_dict = {grid_type: p1_new_agg}
 #     p1_old_agg_dict = {grid_type: p1_old_agg}
 #     p1_diff_agg_dict = {grid_type: p1_diff_agg}
-    bars(results, grid_type,clim=clim, txt=[typ1, typ2, 'Diff'], show=True, datum=st, sat=sat, v2018s=v_2018, days=nrdays, hours=nrhours)
-    pdb.set_trace()
+    print('Lets plot')
+    if fm:
+        fig = plt.figure(figsize=(11,12))
+        ax = fig.add_subplot(3, 1, 1)
+        ax.set_title('v2018-1 - 1h ERA5')
+        rang = (clim[0], clim[1])
+        bins = 150
+#         mapv = ~(plotted_field == 65535.0)
+        plotted_field = results['v2018-%d_diff_agg' %v]
+        ax.hist(plotted_field, bins=bins, range=rang)
+        
+        ax = fig.add_subplot(3,1,2)
+        ax.set_title('Method')
+        px = []
+        py = []
+        pn = []
+        pnl = []
+        i = 0
+        for namn, val in methodDic.items():
+            i = i + 1
+            px.append(i)
+            py.append(val)
+            pn.append(namn)
+            if val == 0:
+                pnl.append('')
+            else:
+                pnl.append(namn)
+        ax.bar(px,py)
+        ax.set_xticks(px)
+        ax.set_xticklabels(pnl)
+#         ax.set_xlabel(pn)
+        for tick in ax.get_xticklabels():
+            tick.set_rotation(45)
+        
+        ax = fig.add_subplot(3,1,3)
+        ax.set_title('Quality')
+        px = []
+        py = []
+        pn = []
+        i = -1
+        for namn, val in qualityDic.items():
+            i = i + 1
+            px.append(i)
+            py.append(val)
+            pn.append(namn)
+        ax.bar(px,py)
+        ax.set_xticks(px)
+        ax.set_xticklabels(pn)
+#         ax.set_xlabel(pn)
+        for tick in ax.get_xticklabels():
+            tick.set_rotation(45)
+        fig.tight_layout()
+        fig.savefig('test.png')
+        fig.show()
+        pdb.set_trace()
+    else:
+        bars(results, grid_type, pDir=plotDir, clim=clim, txt=[typ1, typ2, 'Diff'], show=args.show, datum=st_datum, sat=sat, v2018s=v_2018, days=nrdays, hours=nrhours, fn=fname)
+#     pdb.set_trace()
     
     sys.exit()
     
