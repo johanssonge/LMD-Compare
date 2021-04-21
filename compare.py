@@ -145,21 +145,37 @@ def bars(obts,field,pDir='./Plots',clim=[180.,300.],txt=[''], show=True, datum='
                       'v2016': 'v2016'}
         if isinstance(obts, dict) and (v2018s is not None):
             obts_use = []
-            txt = []
+            txt_title = []
+            txt_typ = []
             for v in v2018s:
-                obts_use.append(np.asarray(obts['v2018-%d_diff_agg' %v]))
-                txt.append('v2018-%d' %v)
-            obts_use.append(np.asarray(obts['v2016_diff_agg']))
-            txt.append('v2016')
+                txt_title.append('v2018-%d' %v)
+                if v == v2018s[0]:
+                    txt_typ.append('v2018-%d' %v) 
+                if 'Diff' in txt:
+                    obts_use.append(np.asarray(obts['v2018-%d_diff_agg' %v]))
+                    txt_typ.append('Diff')
+                else:
+                    obts_use.append(np.asarray(obts['v2018-%d_p1' %v]))
+                    txt_typ.append('v2018-%d' %v)
+            if 'Diff' in txt:
+                obts_use.append(np.asarray(obts['v2016_diff_agg']))
+                txt_typ.append('Diff')
+            else:
+                obts_use.append(np.asarray(obts['v2016_p1']))
+                txt_typ.append('v2016')
+            txt_title.append('v2016')
             figname_txt = 'v2018s_%s' %datum
         elif not isinstance(obts, list):
             obts_use = [obts]
+            txt_title = txt
+            txt_typ = txt
             figname_txt = '%s_%s_%s' %(txt[0], txt[1], datum)
             
         else:
             obts_use = obts
+            txt_title = txt
+            txt_typ = txt
             figname_txt = '%s_%s_%s' %(txt[0], txt[1], datum)
-            
         # test existence of key field
 #         pdb.set_trace()
 #         if field not in obt_t.var.keys():
@@ -188,7 +204,7 @@ def bars(obts,field,pDir='./Plots',clim=[180.,300.],txt=[''], show=True, datum='
                 plotted_field = obt[field]
             else:
                 plotted_field = obt.var[field].data[:]
-            if (txt[f] == 'Diff') or ((v2018s is not None) and (f > 0)):
+            if (txt_typ[f] == 'Diff'):# or ((v2018s is not None) and (f > 0) and ('Diff' in txt)):
                 rang = (-30, 30)
                 bins = 100
             else:
@@ -203,11 +219,14 @@ def bars(obts,field,pDir='./Plots',clim=[180.,300.],txt=[''], show=True, datum='
 #             plotted_field = np.where(plotted_field == 65535.0, np.nan, plotted_field)
 #             ax.hist(plotted_field, range=rang)#, aspect=1.)
             ax.hist(plotted_field, bins=bins, range=rang)#, aspect=1.)
-            if txt[f] in v2018title.keys():
-                subtitle = v2018title[txt[f]]
+            if txt_title[f] in v2018title.keys():
+                subtitle = v2018title[txt_title[f]]
             else:
-                subtitle = txt[f]
+                subtitle = txt_title[f]
             ax.set_title(subtitle,fontsize=fs)
+            
+            ax.text(0.01, 1.04, chr((f-1) + 98), ha='center', va='center', transform = ax.transAxes, fontsize='x-large')
+            ax.text(0.9, 0.9, 'tot = %d' %len(plotted_field), ha='center', va='center', transform = ax.transAxes, fontsize='large') #f'{10000:,}
 #             if f in [0,1]:
 #             ax.set_ylim((0, 150))
 #             ax.set_yticks([0, 50, 100, 150])
@@ -234,7 +253,11 @@ def bars(obts,field,pDir='./Plots',clim=[180.,300.],txt=[''], show=True, datum='
 # #             cbar=fig.colorbar(im)#, cax=pos_cax)
 #             cbar.ax.tick_params(labelsize=fs)
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-        figname = '%s/hist_diff_%s_%s_%s_clim-%d-%d' %(pDir, sat, field, figname_txt, int(clim[0]), int(clim[1]))
+        if 'Diff' in txt:
+            figname_st = 'hist_diff'
+        else:
+            figname_st = 'hist'
+        figname = '%s/%s_%s_%s_%s_clim-%d-%d' %(pDir, figname_st, sat, field, figname_txt, int(clim[0]), int(clim[1]))
         fig.savefig(figname + '.png')
         if show:
             fig.show()
@@ -341,12 +364,12 @@ if __name__ == '__main__':
 #                 datetime(2017,7,24,8,40), datetime(2017,7,24,9,0), datetime(2017,7,24,9,20), \
 #                 datetime(2017,7,26,15,40), datetime(2017,7,26,16,0), datetime(2017,7,26,16,20)]
     #: Start date
-    st_date = datetime(2017,8,23,0,0)
+    st_date = datetime(2017,8,3,8,0)#datetime(2017,8,23,0,0)
     st_datum = st_date.isoformat().replace('-', '').replace(':', '')[0:-2]
     
     all_dates = []
     #: Add days
-    nrdays = 1#10
+    nrdays = 10
     nrhours = 24
     nrkvart = 24*4
     for d in range(nrdays):
@@ -374,10 +397,10 @@ if __name__ == '__main__':
     #: Dict for results.
     results = {}
     for v in v_2018:
-        results.update({'v2018-%d_p1' %v: ''})
+        results.update({'v2018-%d_p1' %v: []})
         results.update({'v2018-%d_diff' %v: ''})
         results.update({'v2018-%d_diff_agg' %v: []})
-    results.update({'v2016_p1': ''})
+    results.update({'v2016_p1': []})
     results.update({'v2016_diff': ''})
     results.update({'v2016_diff_agg': []})
     if (fname != 'All') and (fname not in np.asarray(['Cloud-free', 'No_reliable_method', 'Opaque_cloud_RTTOV_not_available', 'Opaque_cloud_using_RTTOV', 'Opaque_cloud_using_RTTOV_in_case_thermal_inversion', 'Intercept_method_108um_134um', 'Intercept_method_108um_62um', 'Intercept_method_108um_70um', 'Intercept_method_108um_73um', 'Radiance_ratioing_method_108um_134um', 'Radiance_ratioing_method_108um_62um', 'Radiance_ratioing_method_108um_70um', 'Radiance_ratioing_method_108um_73um', 'Spatial_smoothing'])):
@@ -471,20 +494,22 @@ if __name__ == '__main__':
                                     v2018_prod)
             else:
                 use_data = v2018_p1.var[grid_type].data
-            #: Add to results
-            results['v2018-%d_p1' %v] = use_data
             
             #: Create mask width valid data
             
             v2018_valid_mask = createClimMask(use_data, 
                                               clim[0], clim[1], 
                                               v2018_maskprod.fill_value)
+            #: Add to results
+            results['v2018-%d_p1' %v].extend(use_data[v2018_valid_mask])
+
             if v == v_0:
                 results.update({'v2018-%d_fill_value' %v_0: v2018_maskprod.fill_value})
                 results.update({'v2018-%d_valid_mask' %v_0: v2018_valid_mask})
                 #: Not diff for v_0
                 p1_diff_var = use_data[v2018_valid_mask]
                 results['v2018-%d_diff_agg' %v].extend(p1_diff_var)
+                use_data_v0 = use_data
                 if fm:
                     if (a == 1):
                         #: initiate
@@ -507,10 +532,10 @@ if __name__ == '__main__':
 #             p1_diff_var = np.where(valid_mask, 
 #                                    results['v2018-%d_p1' %v_0].var[grid_type].data - v2018_p1.var[grid_type].data, 
 #                                    v2018_maskprod.fill_value)
-            p1_diff_var = results['v2018-%d_p1' %v_0][valid_mask] - use_data[valid_mask]
+            p1_diff_var = use_data_v0[valid_mask] - use_data[valid_mask]
             #: Aggregate
             results['v2018-%d_diff_agg' %v].extend(p1_diff_var)
-            
+
             plot_single = False
             if plot_single:    
                 p1_diff = {grid_type: p1_diff_var}
@@ -558,16 +583,18 @@ if __name__ == '__main__':
             v2016_p1 = geosat.SatGrid(v2016_data, v2016_gg)
             v2016_p1._sat_togrid(grid_type)
             
-            results['v2016_p1'] = v2016_p1
+            use_data = v2016_p1.var[grid_type].data
             v2016_valid_mask = ((v2016_p1.var[grid_type].data != v2016_maskprod.fill_value) & \
                                     (v2016_p1.var[grid_type].data >= clim[0]) & \
                                     (v2016_p1.var[grid_type].data <= clim[1])) 
+            
+            results['v2016_p1'].extend(use_data[v2016_valid_mask])
             valid_mask = ((results['v2018-%d_valid_mask' %v_0]) & (v2016_valid_mask))
     #         p1_diff_var = np.where(valid_mask, 
     #                                results['v2018-%d_p1' %v_0].var[grid_type].data - v2016_p1.var[grid_type].data, 
     #                                v2016_maskprod.fill_value)
 #             p1_diff_var = results['v2018-%d_p1' %v_0].var[grid_type].data[valid_mask] - v2016_p1.var[grid_type].data[valid_mask]
-            p1_diff_var = results['v2018-%d_p1' %v_0][valid_mask] - v2016_p1.var[grid_type].data[valid_mask]
+            p1_diff_var = use_data_v0[valid_mask] - use_data[valid_mask]
             #: Aggregate
             results['v2016_diff_agg'].extend(p1_diff_var)
             plot_single = False
@@ -665,6 +692,7 @@ if __name__ == '__main__':
         pdb.set_trace()
     else:
         bars(results, grid_type, pDir=plotDir, clim=clim, txt=[typ1, typ2, 'Diff'], show=args.show, datum=st_datum, sat=sat, v2018s=v_2018, days=nrdays, hours=nrhours, fn=fname)
+        bars(results, grid_type, pDir=plotDir, clim=clim, txt=[typ1, typ2], show=args.show, datum=st_datum, sat=sat, v2018s=v_2018, days=nrdays, hours=nrhours, fn=fname)
 #     pdb.set_trace()
     
     sys.exit()
