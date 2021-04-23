@@ -32,6 +32,119 @@ from SAFNWCnc import SAFNWC_CTTH  # @UnresolvedImport
 satConversion = {'hima08': 'himawari', 'msg1': 'msg1', 'msg3': 'msg3'}
 #----------------------------------------------------
 
+def chart_area(obts):#,field,cmap='jet'):#,clim=[180.,300.],txt=[''],subgrid=None, block=True, xlocs=None, figsize= None, show=True, typ1='', typ2='', datum='', sat=''):
+        import matplotlib.patches as mpatches
+#         if not isinstance(obts, list):
+        # test existence of key field
+        geogrid = obts.geogrid
+        fig = plt.figure()#figsize=[11,4])
+#         fig.subplots_adjust(hspace=0,wspace=0.5,top=0.925,left=0.)
+#         fig.suptitle('%s, %s, %s' %(sat, field, datum))
+        fs = 15
+        # it is unclear how the trick with cm_lon works in imshow but it does
+        # the web says that it is tricky to plot data accross dateline with cartopy
+        # check https://stackoverflow.com/questions/47335851/issue-w-image-crossing-dateline-in-imshow-cartopy
+        cm_lon =0
+        # guess that we want to plot accross dateline
+        if geogrid.box_range[0,1]> 181:
+            cm_lon = 180
+        proj = ccrs.PlateCarree()#central_longitude=cm_lon)
+#         ax = plt.axes(projection = proj)
+        ax = fig.add_subplot(111, projection = proj)
+        ax.set_global()
+#                 # extraction in subgrid
+#                 plotted_field = obt.var[field][geogrid.corner[1]:geogrid.corner[1]+geogrid.box_biny,
+#                                                 geogrid.corner[0]:geogrid.corner[0]+geogrid.box_binx]
+#         ax.add_patch(mpatches.Rectangle(xy=[-10, 0], width=170, height=50,
+#                                     facecolor='blue',
+#                                     alpha=0.2,
+#                                     transform=ccrs.PlateCarree()))
+        lons = np.linspace(geogrid.box_range[0,0], geogrid.box_range[0,1], geogrid.box_binx+1)[0:-1]
+        lats = np.linspace(geogrid.box_range[1,0], geogrid.box_range[1,1], geogrid.box_biny+1)[0:-1]
+        
+        ul_lon = lons[obts.var['CTTH_PRESS'].mask[-1, :]][0]
+        ur_lon = lons[obts.var['CTTH_PRESS'].mask[-1, :]][-1]
+        ll_lon = lons[obts.var['CTTH_PRESS'].mask[0, :]][0]
+        lr_lon = lons[obts.var['CTTH_PRESS'].mask[0, :]][-1]
+        
+        ul_lat = lats[obts.var['CTTH_PRESS'].mask[:, 0]][-1]
+        ur_lat = lats[obts.var['CTTH_PRESS'].mask[:, -1]][-1]
+        ll_lat = lats[obts.var['CTTH_PRESS'].mask[:, 0]][0]
+        lr_lat = lats[obts.var['CTTH_PRESS'].mask[:, -1]][0]
+        ax.add_patch(mpatches.Rectangle(xy=[-10, 0], width=170, height=50,
+                                        facecolor='blue',
+                                        alpha=0.2,
+                                        transform=ccrs.PlateCarree()))
+#         ax.plot([ul_lon, ur_lon], [ul_lat, ur_lat], color='red',      transform=ccrs.Geodetic())
+        
+        
+        
+        ax.gridlines()
+        ax.coastlines()
+        fig.savefig('maps.png')
+        fig.show()
+        pdb.set_trace()
+        sys.exit()
+#             im = ax.imshow(plotted_field, transform=proj, interpolation='nearest',
+#                         extent=geogrid.box_range.flatten()-np.array([cm_lon,cm_lon,0,0]),
+#                         origin='lower', aspect=1.,cmap=cmap,clim=clim)
+#             
+#             ax.add_feature(feature.NaturalEarthFeature(
+#                 category='cultural',
+#                 name='admin_1_states_provinces_lines',
+#                 scale='50m',
+#                 facecolor='none'))
+#             
+#             ax.coastlines('50m')
+#             #ax.add_feature(feature.BORDERS)
+#             # The grid adjusts automatically with the following lines
+#             # If crossing the dateline, superimposition of labels there
+#             # can be suppressed by specifying xlocs
+#     
+#             if (cm_lon == 180) & (xlocs == None): 
+#                 xlocs = [0,30,60,90,120,150,180,-150,-120,-90,-60,-30]
+#             gl = ax.gridlines(draw_labels=True, xlocs=xlocs,
+#                           linewidth=2, color='gray', alpha=0.5, linestyle='--')
+#             if f in [0,1]:
+#                 gl.bottom_labels = False
+#             gl.top_labels = False
+#             gl.right_labels = False
+#             #gl.xformatter = LONGITUDE_FORMATTER
+#             #gl.yformatter = LATITUDE_FORMATTER
+#             gl.xlabel_style = {'size': fs}
+#             gl.ylabel_style = {'size': fs}
+#             #gl.xlabel_style = {'color': 'red', 'weight': 'bold'}
+#             ax.set_title(txt[f],fontsize=fs)
+# #             plt.title(txt,fontsize=fs)
+#             # plot adjusted colorbar and show
+#             
+# #             barticks = [valminmax*-1, valminmax*-0.75, valminmax*-0.5, valminmax*-0.25, 0, valminmax*0.25, valminmax*0.5, valminmax*0.75, valminmax]
+# #             cbar_ax = fig.add_axes([0.2, 0.25, 0.6, 0.01])
+# #             cbar = fig.colorbar(im, orientation='horizontal', cax=cbar_ax, ticks=barticks)  # @UnusedVariable
+#             
+#             axpos = ax.get_position()
+# #             pos_x = axpos.x0 + axpos.x0 + axpos.width + 0.01
+#             pos_x = axpos.x0 + axpos.width + 0.01
+# #             pos_cax = fig.add_axes([pos_x,axpos.y0,0.04,axpos.height])
+#             if f in [0,1]:
+#                 barticks = [clim[0], clim[0] + 40, clim[0] + 80, clim[1]]
+#             else:
+#                 barticks = [clim[0], clim[0] + 10, 0, clim[0] + 30, clim[1]]
+#             cbar_ax = fig.add_axes([pos_x, axpos.y0, 0.01, axpos.height])
+#             cbar = fig.colorbar(im, orientation='vertical', cax=cbar_ax, ticks=barticks)  # @UnusedVariable
+# #             cbar=fig.colorbar(im)#, cax=pos_cax)
+#             cbar.ax.tick_params(labelsize=fs)
+#         figname = '/scratch/erikj/Proj1/Plots/map_diff_%s_%s_%s_%s_%s' %(sat, field, txt[0], txt[2], datum)
+#         fig.savefig(figname + '.png')
+#         if show:
+#             fig.show()
+#             pdb.set_trace()
+#         return ax
+
+
+
+
+
 def chart(obts,field,cmap='jet',clim=[180.,300.],txt=[''],subgrid=None, block=True, xlocs=None, figsize= None, show=True, typ1='', typ2='', datum='', sat=''):
         if not isinstance(obts, list):
             obts = [obts]
@@ -459,17 +572,15 @@ if __name__ == '__main__':
             #: --- New Grid ---
             #: Initiate the data
             v2018_data = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=v2018_file)
-            v2018_data_flag = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=v2018_file)
-            flag_meaning = v2018_data_flag.ncid.variables['ctth_method'].flag_meanings.split()
-            flag_values = v2018_data_flag.ncid.variables['ctth_method'].flag_values
-            flag_data = v2018_data_flag.ncid.variables['ctth_method'][:].data
-            qual_meaning = v2018_data_flag.ncid.variables['ctth_quality'].flag_meanings.split()
+            flag_meaning = v2018_data.ncid.variables['ctth_method'].flag_meanings.split()
+            flag_values = v2018_data.ncid.variables['ctth_method'].flag_values
+            flag_data = v2018_data.ncid.variables['ctth_method'][:].data
+            qual_meaning = v2018_data.ncid.variables['ctth_quality'].flag_meanings.split()
             #: ['nodata', 'internal_consistency', 'temporal_consistency', 'good', 'questionable', 'bad', 'interpolated']
-            qual_values = v2018_data_flag.ncid.variables['ctth_quality'].flag_values
+            qual_values = v2018_data.ncid.variables['ctth_quality'].flag_values
             #: array([ 1,  2,  4,  8, 16, 24, 32]
-            qual_data = v2018_data_flag.ncid.variables['ctth_quality'][:].data
+            qual_data = v2018_data.ncid.variables['ctth_quality'][:].data
 #             for i in range(len(flag_values)):
-                
             if fname == 'All':
                 fmask = np.zeros(flag_data.shape).astype(bool)
             else:
@@ -510,6 +621,8 @@ if __name__ == '__main__':
                 p1_diff_var = use_data[v2018_valid_mask]
                 results['v2018-%d_diff_agg' %v].extend(p1_diff_var)
                 use_data_v0 = use_data
+#                 chart_area(v2018_p1)
+#                 pdb.set_trace()
                 if fm:
                     if (a == 1):
                         #: initiate
@@ -565,10 +678,9 @@ if __name__ == '__main__':
             #: --- New Grid ---
             #: Initiate the data
             v2016_data = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=v2016_file)
-            v2016_data_flag = SAFNWC_CTTH(date,sat_dir,BBname='SAFBox',fullname=v2018_file)
-            flag_meaning = v2016_data_flag.ncid.variables['ctth_method'].flag_meanings.split()
-            flag_values = v2016_data_flag.ncid.variables['ctth_method'].flag_values
-            flag_data = v2016_data_flag.ncid.variables['ctth_method'][:].data
+            flag_meaning = v2016_data.ncid.variables['ctth_method'].flag_meanings.split()
+            flag_values = v2016_data.ncid.variables['ctth_method'].flag_values
+            flag_data = v2016_data.ncid.variables['ctth_method'][:].data
             if fname == 'All':
                 fmask = np.zeros(flag_data.shape).astype(bool)
             else:
