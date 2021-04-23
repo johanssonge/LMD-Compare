@@ -81,6 +81,7 @@ def chart_area(obts):#,field,cmap='jet'):#,clim=[180.,300.],txt=[''],subgrid=Non
         
         ax.gridlines()
         ax.coastlines()
+        fig.tight_layout()
         fig.savefig('maps.png')
         fig.show()
         pdb.set_trace()
