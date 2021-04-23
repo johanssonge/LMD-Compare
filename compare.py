@@ -338,9 +338,8 @@ def bars(obts,field,pDir='./Plots',clim=[180.,300.],txt=[''], show=True, datum='
             else:
                 subtitle = txt_title[f]
             ax.set_title(subtitle,fontsize=fs)
-            
-            ax.text(0.01, 1.04, chr((f-1) + 98), ha='center', va='center', transform = ax.transAxes, fontsize='x-large')
-            ax.text(0.9, 0.9, 'tot = %d' %len(plotted_field), ha='center', va='center', transform = ax.transAxes, fontsize='large') #f'{10000:,}
+            ax.text(0.03, 1.04, chr((f-1) + 98), ha='center', va='center', transform = ax.transAxes, fontsize='x-large')
+            ax.text(0.9, 0.9, 'tot = %s' %(f'{len(plotted_field):,}'), ha='center', va='center', transform = ax.transAxes, fontsize='large') #f'{10000:,}
 #             if f in [0,1]:
 #             ax.set_ylim((0, 150))
 #             ax.set_yticks([0, 50, 100, 150])
