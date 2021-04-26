@@ -367,7 +367,6 @@ if __name__ == '__main__':
             v2018_valid_mask = ((v2018_p1.var[grid_type].data != v2018_maskprod.fill_value) & \
                                 (v2018_p1.var[grid_type].data >= clim[0]) & \
                                 (v2018_p1.var[grid_type].data <= clim[1]))
-            
             if v == v_0:
                 results.update({'v2018-%d_fill_value' %v_0: v2018_maskprod.fill_value})
                 results.update({'v2018-%d_valid_mask' %v_0: v2018_valid_mask})
@@ -406,6 +405,7 @@ if __name__ == '__main__':
         #: Take care of latitude and longitude
         sfn = saveLatLon(v2016_ncf, v2016_file)
         lat, lon = getLatLon(sfn)
+        pdb.set_trace()
         v2016_ncf.close()
         #: --- New Grid ---
         #: Initiate the data
